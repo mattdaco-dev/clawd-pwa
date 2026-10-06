@@ -781,7 +781,7 @@ const STATIONS = ['desk', 'shelf', 'board', 'coffee', 'radio', 'beanbag', 'rug',
 // Furnishes one area (a room, or the whole shared office) and returns its
 // walkable zone and stations. Every station type always exists; quantities and
 // positions vary with the seed, which keeps a layout stable across rebuilds.
-function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p, u, props, clocks }) {
+function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p, u, props, clocks, skies, lamps }) {
   const W = x1 - x0;
   const wallH = u(110);
   const wall = top + wallH;
@@ -876,6 +876,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
   for (let i = 0; i < windows; i++) {
     const left = winFrom + ((winTo - winFrom - u(100)) * (i + 0.5)) / windows - u(50) + u(between(-12, 12));
     drawSprite(g, WINDOW, left, wall - u(84), p);
+    skies.push({ left: Math.round(left), top: Math.round(wall - u(84)) });
   }
 
   // Vertical plan: desk rows, then a middle band (meeting table, radio), then the
@@ -997,7 +998,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
 // meeting corner on the left, islands of desks in the middle split by low
 // bookcases, kitchen and lounge on the right, a clear walkway at the front.
 // Structured rather than scattered; the seed only picks variants and fabrics.
-function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
+function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies, lamps }) {
   const W = x1 - x0;
   const wallH = u(110);
   const wall = top + wallH;
@@ -1077,6 +1078,7 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   slot('shelf', x0 + u(60), readBase + u(34));
   seat(readingChair, x0 + u(158), readBase - readingChair.h * p, 'beanbag');
   standing(LAMP, x0 + u(195), readBase);
+  lamps.push({ x: x0 + u(195) + 3 * p, y: readBase - LAMP.h * p + 1.5 * p });
   if (lx1 - x0 >= u(360)) seat(readingChair, x0 + u(263), readBase - readingChair.h * p, 'beanbag');
 
   // Copy corner, low on the left: printer between filing cabinets.
@@ -1119,6 +1121,7 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   prop(sofa, loungeX - (sofa.w * p) / 2, sofaTop, sofaTop + 2 * p);
   for (const dx of [-u(30), u(30)]) slot('beanbag', loungeX + dx, sofaTop + sofa.seat * p);
   standing(LAMP, loungeX - (sofa.w * p) / 2 - u(40), sofaBase);
+  lamps.push({ x: loungeX - (sofa.w * p) / 2 - u(40) + 3 * p, y: sofaBase - LAMP.h * p + 1.5 * p });
   const radioLeft = loungeX + (sofa.w * p) / 2 + u(14);
   standing(RADIO, radioLeft, sofaBase);
   slot('radio', radioLeft + RADIO.w * p + u(40), sofaBase - u(4));
@@ -1226,7 +1229,10 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   for (let i = 0; i < windows; i++) {
     const cx = wallFrom + (span * (i + 0.5)) / windows;
     if (i === middle) clocks.push({ x: cx, y: top + Math.round(wallH * 0.45) });
-    else drawSprite(g, WINDOW, cx - u(50), wall - u(84), p);
+    else {
+      drawSprite(g, WINDOW, cx - u(50), wall - u(84), p);
+      skies.push({ left: Math.round(cx - u(50)), top: Math.round(wall - u(84)) });
+    }
   }
   if (middle < 0) clocks.push({ x: wallFrom + span / 2, y: top + Math.round(wallH * 0.45) });
 
@@ -1258,7 +1264,9 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   const u = (n) => Math.round(n * k);
   const props = [];
   const clocks = [];
-  const env = { p: px, u, props, clocks };
+  const skies = []; // window panes, repainted with the sky of the hour
+  const lamps = [];
+  const env = { p: px, u, props, clocks, skies, lamps };
   const zones = [];
   let height = viewHeight;
   let background;
@@ -1299,8 +1307,69 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     props,
     overlay(ctx, date) {
       for (const clock of clocks) drawClock(ctx, clock, date, u);
+      const light = daylight(date);
+      if (light.night || light.dusk) skies.forEach((w, i) => drawSky(ctx, w, i, light, px));
+    },
+    // Drawn over everything: the evening dims the office, lamps light up around
+    // them. Returns how dark it is, so labels can switch to a light ink.
+    shade(ctx, date, width, h) {
+      const { night, dusk } = daylight(date);
+      if (dusk) {
+        ctx.fillStyle = `rgb(242 140 60 / ${0.08 * dusk})`;
+        ctx.fillRect(0, 0, width, h);
+      }
+      if (!night) return 0;
+      // Multiplied rather than painted over, so colours darken without going grey.
+      const tint = [255, 255, 255].map((v, i) => Math.round(v + ([118, 128, 186][i] - v) * night));
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = `rgb(${tint.join(' ')})`;
+      ctx.fillRect(0, 0, width, h);
+      ctx.restore();
+      for (const { x, y } of lamps) {
+        const r = u(150);
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, r);
+        glow.addColorStop(0, `rgb(255 214 120 / ${0.42 * night})`);
+        glow.addColorStop(1, 'rgb(255 214 120 / 0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+      }
+      return night;
     },
   };
+}
+
+// How dark it is from the local hour: night 0 by day, 1 from 21:00 to 6:00, with
+// an hour-long ramp around; dusk peaks at sunset and sunrise.
+export function daylight(date) {
+  const h = date.getHours() + date.getMinutes() / 60;
+  const night = h >= 21 || h < 6 ? 1 : h >= 18 ? (h - 18) / 3 : h < 8 ? (8 - h) / 2 : 0;
+  const peak = (at, width) => Math.max(0, 1 - Math.abs(h - at) / width);
+  return { night, dusk: Math.max(peak(19.5, 1.5), peak(6.5, 1)) };
+}
+
+const DAY_SKY = [191, 224, 255];
+const DUSK_SKY = [244, 170, 120];
+const NIGHT_SKY = [31, 42, 77];
+
+// Paints the panes of a WINDOW sprite with the sky of the hour, stars at night.
+function drawSky(ctx, { left, top }, index, { night, dusk }, p) {
+  const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  // The sky turns dark later than the room, so sunset stays orange.
+  const [r, g, b] = mix(mix(DAY_SKY, DUSK_SKY, dusk), NIGHT_SKY, Math.max(0, (night - 0.3) / 0.7));
+  ctx.fillStyle = `rgb(${r} ${g} ${b})`;
+  for (const [x0, y0] of [[1, 1], [11, 1], [1, 7], [11, 7]]) {
+    ctx.fillRect(left + x0 * p, top + y0 * p, 8 * p, (y0 === 1 ? 5 : 6) * p);
+  }
+  if (night < 0.6) return;
+  ctx.fillStyle = '#fff6d6';
+  for (let k = 0; k < 3; k++) {
+    // The same few stars in each window every night.
+    const n = (index * 7 + k * 13) % 29;
+    const x = [2, 5, 7, 12, 15, 17][n % 6];
+    const y = [2, 3, 4, 8, 10][n % 5];
+    ctx.fillRect(left + x * p, top + y * p, p, p);
+  }
 }
 
 function drawClock(ctx, { x, y }, date, u) {

@@ -10,6 +10,20 @@ const HALF_BODY = 10; // body half-width in sprite pixels, arms included
 const WALK_SPEED = 7; // sprite pixels per second, at least
 const MAX_TRIP = 3; // seconds; long trips walk faster
 const SLEEP_AFTER = 120_000;
+const SLEEP_AFTER_NIGHT = 30_000; // from 20:00 to 7:00
+
+// The scene's clock: local time, or a fixed hour from `?heure=22` to try the night.
+const forcedHour = new URLSearchParams(location.search).get('heure');
+function sceneDate() {
+  const date = new Date();
+  if (forcedHour !== null && Number.isFinite(Number(forcedHour))) date.setHours(Number(forcedHour), 0);
+  return date;
+}
+
+function sleepAfter() {
+  const h = sceneDate().getHours();
+  return h >= 20 || h < 7 ? SLEEP_AFTER_NIGHT : SLEEP_AFTER;
+}
 
 // Where each state happens in the office, and what is played once there.
 // `loose` replaces `anims` when every place at the station is taken.
@@ -178,7 +192,7 @@ class Critter {
   planFor(now) {
     if (this.state === 'working') return WORK[this.activity] ?? WORK.type;
     if (this.state === 'waiting') return WAIT;
-    if (now - this.idleSince > SLEEP_AFTER) return SLEEP;
+    if (now - this.idleSince > sleepAfter()) return SLEEP;
     return weighted(IDLE);
   }
 
@@ -578,7 +592,7 @@ const GAMES = [BallGame, SwordDuel, DanceDuo];
 // Idle Clawds free to start a game: not walking, not asleep, not already playing.
 function available(critter, now) {
   return !critter.leaving && !critter.duo && !critter.locked && !critter.target &&
-    critter.state === 'idle' && critter.plan && critter.plan !== SLEEP && now - critter.idleSince < SLEEP_AFTER;
+    critter.state === 'idle' && critter.plan && critter.plan !== SLEEP && now - critter.idleSince < sleepAfter();
 }
 
 // A rug with nobody on it but the players (spots come in threes, left to right).
@@ -785,8 +799,9 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       if (critter.dead) critters.delete(key);
     }
 
+    const date = sceneDate();
     ctx.drawImage(office.background, 0, 0, width, height);
-    office.overlay(ctx, new Date());
+    office.overlay(ctx, date);
 
     // Furniture and Clawds back to front, so whoever stands lower is drawn over the rest.
     const scene = [
@@ -795,6 +810,8 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       ...duos.map((d) => ({ y: d.y, draw: () => d.draw(ctx, now) })),
     ].sort((a, b) => a.y - b.y);
     for (const item of scene) item.draw();
+    // Night falls on furniture and Clawds alike; the names stay readable.
+    const dark = (office.shade?.(ctx, date, width, height) ?? 0) > 0.5;
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
@@ -802,7 +819,7 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       if (critter.leaving) continue;
       const main = critter.kind === 'main';
       ctx.font = main ? '600 13px ui-monospace, monospace' : '11px ui-monospace, monospace';
-      ctx.fillStyle = main ? '#3d3929' : '#8f8b82';
+      ctx.fillStyle = dark ? (main ? '#f0eee6' : '#c9c5b9') : main ? '#3d3929' : '#8f8b82';
       ctx.fillText(critter.label ?? '', Math.round(critter.x), Math.round(critter.y) + 12 + critter.scale);
     }
 

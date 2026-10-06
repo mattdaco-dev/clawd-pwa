@@ -33,6 +33,13 @@ porte les réglages, gardés dans le navigateur :
   postes).
 - Taille des pixels : de 3 à 6 px, décor compris. Les subagents ont toujours un pixel de moins.
 
+L'open space suit l'heure locale : ciel orangé au coucher du soleil, nuit étoilée dans les fenêtres
+et lampes allumées de 21 h à 6 h. Après 20 h, les Clawd au repos s'endorment au bout de 30 s au lieu
+de 2 minutes. Pour voir la nuit en plein jour, ouvrir `/?heure=22`.
+
+Le titre de l'onglet et l'icône de la PWA installée affichent le nombre d'agents qui attendent un
+input.
+
 Avec `CLAWD_LOG=1`, le hook garde une copie brute de chaque payload dans `logs/events.jsonl`
 (5 Mo max). Coupé par défaut : les payloads contiennent les prompts et les entrées d'outils en
 clair. Le hook est déclaré `async`, il ne bloque jamais Claude : sortie vide, code 0.
@@ -49,5 +56,7 @@ clair. Le hook est déclaré `async`, il ne bloque jamais Claude : sortie vide, 
   session) et ses postes : bureau
   pour taper, bibliothèque et globe pour chercher et le web, tableau blanc pour réfléchir, avant-scène
   pour attendre un input, café, radio, tapis de jeu et poufs pour la sieste. Deux Clawd au repos dans
-  la même zone se retrouvent parfois sur un tapis pour une passe de ballon ou un duel à l'épée
-  (`BallGame` et `SwordDuel` dans `live.js`).
+  la même zone se retrouvent parfois sur un tapis pour une passe de ballon ou un duel à l'épée, ou
+  devant une radio pour danser (`BallGame`, `SwordDuel`, `DanceDuo` dans `live.js`). Un troisième
+  vient parfois regarder et applaudit à la fin. Un Clawd qui finit son travail tape dans la main d'un
+  voisin au repos (`HighFive`), et un subagent terminé apporte son rapport à son agent principal.
