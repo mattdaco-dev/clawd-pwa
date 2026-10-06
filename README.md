@@ -24,7 +24,8 @@ Le service écrit le chemin absolu de `node` dans le plist (launchd ne voit pas 
 
 Ouvrir http://localhost:4777 dans Chrome, puis « Installer l'application » pour en faire une PWA.
 Le bouton rond en haut à gauche ouvre le menu : Live (les vraies sessions), Démo (un scénario en
-boucle sans Claude Code) et Galerie (toutes les animations regroupées par activité).
+boucle sans Claude Code) et Galerie (toutes les animations regroupées par activité). Le même menu
+choisit le décor (aucun ou open space, la plage viendra ensuite) ; le choix reste dans le navigateur.
 
 Le hook garde une copie brute de chaque payload dans `logs/events.jsonl` (5 Mo max, `CLAWD_LOG=0`
 pour couper). Il ne bloque jamais Claude : sortie vide, code 0, envoi au serveur détaché.
@@ -35,6 +36,8 @@ pour couper). Il ne bloque jamais Claude : sortie vide, code 0, envoi au serveur
 - `server.js` : traduit les événements en état par agent (`working`, `waiting`, `idle`) et le diffuse en SSE.
 - `public/sprites.js` : toutes les animations, en grilles de pixels composées par code.
 - `public/live.js` : la scène plein écran (vues Live et Démo), `public/gallery.js` : la galerie.
+- `public/decor.js` : le registre des décors ; un décor fournit le fond, une zone par session avec ses
+  postes, les meubles triés en profondeur avec les Clawd et un calque redessiné à chaque image.
 - `public/office.js` : le décor open space (une colonne meublée par session) et ses postes : bureau
   pour taper, bibliothèque pour chercher, radio pour le web, tableau blanc pour réfléchir, avant-scène
   pour attendre un input, café, tapis de jeu et poufs pour la sieste.

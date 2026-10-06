@@ -1,6 +1,6 @@
 import { ANIMS, FRAME_H } from './sprites.js';
 import { PALETTES, cycleDone, drawFrame, fitCanvas, frameIndex } from './render.js';
-import { buildOffice, drawClock } from './office.js';
+import { DECORS, DEFAULT_DECOR } from './decor.js';
 
 const SCALE = { main: 5, sub: 4 };
 const FEET = FRAME_H - 1; // rows from the top of a frame down to below the feet
@@ -133,7 +133,7 @@ class Critter {
 
     this.release();
     if (plan.station) {
-      this.slot = zone.stations[plan.station].find((s) => !s.occupant) ?? null;
+      this.slot = zone.stations[plan.station]?.find((s) => !s.occupant) ?? null;
       if (this.slot) this.slot.occupant = this;
     }
     if (this.slot) return this.walkTo(this.slot.spot(this.scale), zone);
@@ -236,7 +236,7 @@ function demoSnapshot(seconds) {
 }
 
 // One scene: fed by the server snapshots, or by the scripted demo when `demo` is set.
-export function createLive(root, { demo = false } = {}) {
+export function createLive(root, { demo = false, decor = DEFAULT_DECOR } = {}) {
   root.innerHTML = `
     <div class="stage"><canvas></canvas></div>
     <div class="live-bar"><span class="status" data-state="off">hors ligne</span></div>`;
@@ -273,13 +273,13 @@ export function createLive(root, { demo = false } = {}) {
     status.textContent = connected ? `connecté · ${n} session${n > 1 ? 's' : ''}` : 'hors ligne';
   }
 
-  // Rebuilds the furniture when the window or the list of sessions changes.
+  // Rebuilds the decor when the window, the decor or the list of sessions changes.
   function ensureOffice(sessions) {
     const names = sessions.map((s) => s.name || s.id.slice(0, 8));
-    const key = `${width}x${height}|${names.join('|')}`;
+    const key = `${decor}|${width}x${height}|${names.join('|')}`;
     if (key === officeKey) return;
     officeKey = key;
-    office = buildOffice(width, height, names);
+    office = (DECORS[decor] ?? DECORS[DEFAULT_DECOR]).build(width, height, names);
     for (const critter of critters.values()) critter.relocate();
   }
 
@@ -314,8 +314,7 @@ export function createLive(root, { demo = false } = {}) {
     }
 
     ctx.drawImage(office.background, 0, 0, width, height);
-    const date = new Date();
-    for (const clock of office.clocks) drawClock(ctx, clock, date);
+    office.overlay(ctx, new Date());
 
     // Furniture and Clawds back to front, so whoever stands lower is drawn over the rest.
     const scene = [
@@ -367,6 +366,9 @@ export function createLive(root, { demo = false } = {}) {
     setConnected(value) {
       connected = value;
       renderStatus();
+    },
+    setDecor(name) {
+      decor = name;
     },
   };
 }

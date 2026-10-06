@@ -1,10 +1,20 @@
+import { DECORS, DEFAULT_DECOR } from './decor.js';
 import { createGallery } from './gallery.js';
 import { createLive } from './live.js';
 
-const live = createLive(document.getElementById('live'));
+// The decor choice is a per-viewer convenience; storage may be unavailable.
+const DECOR_KEY = 'clawd.decor';
+let decor = DEFAULT_DECOR;
+try {
+  decor = localStorage.getItem(DECOR_KEY) ?? DEFAULT_DECOR;
+} catch {}
+if (!(decor in DECORS)) decor = DEFAULT_DECOR;
+
+const live = createLive(document.getElementById('live'), { decor });
+const demo = createLive(document.getElementById('demo'), { demo: true, decor });
 const views = {
   live,
-  demo: createLive(document.getElementById('demo'), { demo: true }),
+  demo,
   galerie: createGallery(document.getElementById('gallery')),
 };
 
@@ -17,7 +27,21 @@ function setMenu(open) {
 }
 
 menuButton.addEventListener('click', () => setMenu(menu.hidden));
-menu.addEventListener('click', () => setMenu(false));
+menu.addEventListener('click', (e) => {
+  if (e.target.closest('a')) setMenu(false);
+});
+
+for (const input of menu.querySelectorAll('input[name="decor"]')) {
+  input.checked = input.value === decor;
+  input.addEventListener('change', () => {
+    decor = input.value;
+    live.setDecor(decor);
+    demo.setDecor(decor);
+    try {
+      localStorage.setItem(DECOR_KEY, decor);
+    } catch {}
+  });
+}
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.menu')) setMenu(false);
 });

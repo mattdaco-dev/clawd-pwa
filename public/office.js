@@ -1,4 +1,4 @@
-// Open-space office: a background (wall, floor, whiteboards, windows, rugs),
+// Open-space decor: a background (wall, floor, whiteboards, windows, rugs),
 // furniture that is depth-sorted with the Clawds, and the stations where they
 // go for each activity. One furnished column per Claude Code session.
 import { PALETTES } from './render.js';
@@ -169,11 +169,71 @@ function paintNameplate(g, name, cx) {
   g.fillText(name, cx, 20);
 }
 
+const CABINET = sprite([
+  'GGGGGGGGGG',
+  'GAAAAAAAAG',
+  'GAAAKKAAAG',
+  'GAAAAAAAAG',
+  'GGGGGGGGGG',
+  'GAAAAAAAAG',
+  'GAAAKKAAAG',
+  'GAAAAAAAAG',
+  'GGGGGGGGGG',
+  'GAAAAAAAAG',
+  'GAAAKKAAAG',
+  'GAAAAAAAAG',
+  'GGGGGGGGGG',
+]);
+
+const PRINTER = sprite([
+  '..WWWWWWWW..',
+  '..WWWWWWWW..',
+  'KKKKKKKKKKKK',
+  'KAAAAAAAARAK',
+  'KAAAAAAAAAAK',
+  'KKKKKKKKKKKK',
+  '.KWWWWWWWWK.',
+  '.DDDDDDDDDD.',
+  '.D........D.',
+  '.D........D.',
+  '.D........D.',
+]);
+
+const TABLE = sprite([
+  '..OOOOOOOOOOOOOOOOOOOO..',
+  '.OOOWWOOOOOOOOOOOOWWOOO.',
+  'OOOOWWOOOOOOOOOOOOWWOOOO',
+  '.DDDDDDDDDDDDDDDDDDDDDD.',
+  '..........DDDD..........',
+  '..........DDDD..........',
+  '..........DDDD..........',
+  '.........DDDDDD.........',
+]);
+
+const COOLER = sprite([
+  '..SSSS..',
+  '.SSSSSS.',
+  '.SSSSSS.',
+  '.SSSSSS.',
+  '..SSSS..',
+  'GGGGGGGG',
+  'GWWWWWWG',
+  'GWRWWBWG',
+  'GWWWWWWG',
+  'GWWWWWWG',
+  'GWWWWWWG',
+  'GWWWWWWG',
+  'GGGGGGGG',
+  'GG....GG',
+]);
+
+const STATIONS = ['desk', 'shelf', 'board', 'coffee', 'radio', 'beanbag', 'rug', 'front'];
+
 // Lays out one session's column and returns its walkable area and stations.
 function furnish(g, { x0, x1, wall, floorBottom, name }, props, clocks) {
   const W = x1 - x0;
   const floor = floorBottom - wall;
-  const stations = { desk: [], shelf: [], board: [], coffee: [], radio: [], beanbag: [], rug: [], front: [] };
+  const stations = Object.fromEntries(STATIONS.map((type) => [type, []]));
   const slot = (type, x, y, perScale = 0) => stations[type].push({
     type,
     occupant: null,
@@ -183,54 +243,76 @@ function furnish(g, { x0, x1, wall, floorBottom, name }, props, clocks) {
   const prop = (s, left, top) => {
     props.push({ base: Math.round(top) + s.h * P, draw: (ctx) => drawSprite(ctx, s, left, top) });
   };
+  const standing = (s, left, base) => prop(s, left, base - s.h * P);
 
   paintNameplate(g, name, (x0 + x1) / 2);
 
-  // Along the wall: plant, bookshelf, whiteboard, windows, clock, coffee machine.
+  // Along the wall, left: plant, bookshelves, whiteboard.
   const backBase = wall + 16;
-  prop(PLANT, x0 + 24, backBase - PLANT.h * P);
-  const shelfLeft = x0 + 76;
-  prop(SHELF, shelfLeft, backBase - SHELF.h * P);
-  slot('shelf', shelfLeft + 40, backBase + 36);
-  slot('shelf', shelfLeft + 130, backBase + 36);
-
-  const boardLeft = x0 + 256;
+  const inFront = backBase + 36;
+  standing(PLANT, x0 + 24, backBase);
+  const shelves = W >= 760 ? [x0 + 76, x0 + 166] : [x0 + 76];
+  for (const left of shelves) {
+    standing(SHELF, left, backBase);
+    slot('shelf', left + 40, inFront);
+  }
+  if (shelves.length === 1) slot('shelf', shelves[0] + 130, inFront);
+  const boardLeft = shelves.at(-1) + SHELF.w * P + 60;
   drawSprite(g, BOARD, boardLeft, wall - 18 - BOARD.h * P);
   slot('board', boardLeft + 30, wall + 44);
   slot('board', boardLeft + 120, wall + 44);
 
+  // Along the wall, right: clock, water cooler, coffee machine.
   const coffeeLeft = x1 - 28 - COFFEE.w * P;
-  prop(COFFEE, coffeeLeft, backBase - COFFEE.h * P);
-  slot('coffee', coffeeLeft + 25, backBase + 36);
-  slot('coffee', coffeeLeft - 70, backBase + 36);
-  clocks.push({ x: coffeeLeft - 90, y: Math.round(wall * 0.45) });
+  const coolerLeft = coffeeLeft - 20 - COOLER.w * P;
+  standing(COFFEE, coffeeLeft, backBase);
+  standing(COOLER, coolerLeft, backBase);
+  slot('coffee', coffeeLeft + 25, inFront);
+  slot('coffee', coolerLeft + 20, inFront);
+  slot('coffee', coolerLeft - 70, inFront);
+  clocks.push({ x: coolerLeft - 40, y: Math.round(wall * 0.45) });
 
   const winFrom = boardLeft + BOARD.w * P + 40;
-  const winTo = coffeeLeft - 130;
+  const winTo = coolerLeft - 80;
   const count = Math.max(0, Math.floor((winTo - winFrom + 40) / 140));
   const winStart = winFrom + (winTo - winFrom - (count * 140 - 40)) / 2;
-  for (let i = 0; i < count; i++) drawSprite(g, WINDOW, Math.round(winStart + i * 140), wall - 84);
+  for (let i = 0; i < count; i++) drawSprite(g, WINDOW, winStart + i * 140, wall - 84);
 
-  // Desks in a row, in the middle of the room.
-  const desks = clamp(Math.floor((W - 80) / 170), 1, 3);
+  // Rows of desks (three on tall screens), filing cabinets on the left, printer on the right.
   const deskW = DESK.w * P;
-  const deskTop = wall + floor * 0.36;
-  const deskStart = x0 + (W - (desks * deskW + (desks - 1) * 24)) / 2;
-  for (let i = 0; i < desks; i++) {
-    const left = deskStart + i * (deskW + 24);
-    prop(DESK, left, deskTop);
-    // Feet just behind the desk, so the animation's keyboard lands on the desktop.
-    slot('desk', left + 18 * P, deskTop + (DESK_SURFACE + 1) * P, 2);
+  const desks = clamp(Math.floor((W - 200) / (deskW + 24)), 1, 4);
+  const rowWidth = desks * deskW + (desks - 1) * 24;
+  const deskStart = x0 + (W - rowWidth) / 2;
+  const rows = floor >= 900 ? 3 : 2;
+  const rowGap = Math.max(150, floor * (rows === 3 ? 0.16 : 0.2));
+  const deskTops = Array.from({ length: rows }, (_, r) => wall + floor * 0.17 + r * rowGap);
+  for (const [r, deskTop] of deskTops.entries()) {
+    for (let i = 0; i < desks; i++) {
+      const left = deskStart + i * (deskW + 24);
+      prop(DESK, left, deskTop);
+      // Feet just behind the desk, so the animation's keyboard lands on the desktop.
+      slot('desk', left + 18 * P, deskTop + (DESK_SURFACE + 1) * P, 2);
+    }
+    const deskBase = deskTop + DESK.h * P;
+    if (deskStart - x0 >= 90) standing(CABINET, deskStart - 24 - CABINET.w * P, deskBase);
+    if (x1 - (deskStart + rowWidth) >= 90) standing(r === 0 ? PRINTER : PLANT, deskStart + rowWidth + 24, deskBase);
   }
 
-  // Listening corner.
-  const radioLeft = x1 - 200;
-  const radioBase = wall + floor * 0.6;
-  prop(RADIO, radioLeft, radioBase - RADIO.h * P);
-  slot('radio', radioLeft - 40, radioBase - 4);
-  slot('radio', radioLeft + RADIO.w * P + 40, radioBase - 4);
+  // Meeting table (more room to think) and the listening corner.
+  const middle = wall + floor * (rows === 3 ? 0.7 : 0.66);
+  const tableX = x0 + W * 0.34;
+  const tableTop = middle - TABLE.h * P;
+  prop(TABLE, tableX - (TABLE.w * P) / 2, tableTop);
+  slot('board', tableX, tableTop + 12);
+  slot('board', tableX - 95, middle - 6);
+  slot('board', tableX + 95, middle - 6);
 
-  // Play rug, beanbags and the front of the room.
+  const radioLeft = x1 - 200;
+  standing(RADIO, radioLeft, middle);
+  slot('radio', radioLeft - 40, middle - 4);
+  slot('radio', radioLeft + RADIO.w * P + 40, middle - 4);
+
+  // Play rug, beanbags, plants and the front of the room.
   const rugW = Math.round(clamp(W * 0.3, 160, 300));
   const rugX = x0 + W * 0.6;
   const rugY = wall + floor * 0.86;
@@ -239,10 +321,12 @@ function furnish(g, { x0, x1, wall, floorBottom, name }, props, clocks) {
 
   const bagBase = floorBottom - 8;
   for (const left of [x0 + 28, x0 + 118]) {
-    prop(BEANBAG, left, bagBase - BEANBAG.h * P);
+    standing(BEANBAG, left, bagBase);
     slot('beanbag', left + 35, bagBase - 2 * P);
   }
-  prop(PLANT, x1 - 68, floorBottom - 4 - PLANT.h * P);
+  standing(PLANT, x0 + 200, floorBottom - 4);
+  standing(PLANT, x1 - 68, floorBottom - 4);
+  standing(CABINET, x1 - 130, floorBottom - 4);
 
   for (const f of [0.3, 0.42, 0.54]) slot('front', x0 + W * f, floorBottom - 2);
 
@@ -274,10 +358,17 @@ export function buildOffice(width, height, names) {
       g.fillRect(Math.round(i * zoneWidth) - 2, 0, 4, height);
     }
   }
-  return { background, zones, props, clocks };
+  return {
+    background,
+    zones,
+    props,
+    overlay(ctx, date) {
+      for (const clock of clocks) drawClock(ctx, clock, date);
+    },
+  };
 }
 
-export function drawClock(ctx, { x, y }, date) {
+function drawClock(ctx, { x, y }, date) {
   ctx.fillStyle = '#ffffff';
   ctx.strokeStyle = '#3d3929';
   ctx.lineWidth = 3;
