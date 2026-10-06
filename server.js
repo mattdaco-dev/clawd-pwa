@@ -93,6 +93,9 @@ function apply(p) {
 
   switch (event) {
     case 'SessionStart':
+      // Fired again once a compaction is done: not a new session.
+      if (p.source !== 'compact') set(s, 'idle');
+      break;
     case 'Stop':
     case 'StopFailure':
       set(s, 'idle');
@@ -104,9 +107,21 @@ function apply(p) {
       if (WAIT_TOOLS.has(p.tool_name)) set(agent, 'waiting', 'flag', p.tool_name);
       else set(agent, 'working', activityFor(p.tool_name), p.tool_name);
       break;
-    case 'PostToolUse':
     case 'PostToolUseFailure':
+      // A failed tool (not a cancellation): the PWA plays a one-off « oops ».
+      if (!p.is_interrupt) agent.errorAt = Date.now();
+    // falls through
+    case 'PostToolUse':
       if (agent.state === 'waiting') set(agent, 'working', activityFor(p.tool_name), p.tool_name);
+      break;
+    case 'PreCompact':
+      // Tidies its notes while the conversation is compacted, then goes back to what it was doing.
+      s.beforeCompact = { state: s.state, activity: s.activity, tool: s.tool };
+      set(s, 'working', 'compact');
+      break;
+    case 'PostCompact':
+      if (s.beforeCompact) set(s, s.beforeCompact.state, s.beforeCompact.activity, s.beforeCompact.tool);
+      s.beforeCompact = null;
       break;
     case 'PermissionRequest':
       set(agent, 'waiting', 'flag', p.tool_name);
@@ -126,7 +141,7 @@ function apply(p) {
 
 function snapshot() {
   return {
-    sessions: [...sessions.values()].map(({ subagents, ...s }) => ({ ...s, subagents: [...subagents.values()] })),
+    sessions: [...sessions.values()].map(({ subagents, beforeCompact, ...s }) => ({ ...s, subagents: [...subagents.values()] })),
   };
 }
 

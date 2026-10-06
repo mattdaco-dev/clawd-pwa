@@ -203,6 +203,12 @@ function mug(p, x, y, t = null) {
   if (t % 4 < 2) p(x + 2, y - 4, 'L');
 }
 
+// A red cross in a speech bubble: something went wrong.
+const OOPS = ['.KKKKK.', 'KWWWWWK', 'KWRWRWK', 'KWWRWWK', 'KWRWRWK', 'KWWWWWK', '.KKKKK.'];
+// Desk shredder standing on the floor, its slot on the top row.
+const SHREDDER = ['KKKKKKK', 'KGKKKGK', 'KGGGGGK', 'KGGRGGK', 'KGGGGGK', 'KKKKKKK'];
+const STACK = ['WWWW', 'LLLL', 'WWWW', 'LLLL'];
+
 function hat(p) {
   for (let x = 1; x <= 17; x++) p(x, -1, 'K');
   for (let y = -4; y <= -2; y++) for (let x = 5; x <= 13; x++) p(x, y, y === -2 ? 'H' : 'K');
@@ -354,6 +360,28 @@ export const ANIMS = {
       if (dots >= 1) p(14, -2, 'G');
       if (dots >= 2) stamp(p, 16, -5, ['GG', 'GG']);
       if (dots >= 3) stamp(p, 19, -9, ['GGG', 'GGG', 'GGG']);
+    }),
+  },
+
+  // Tidies its notes while the conversation is compacted: a sheet from the
+  // stack on the left goes through the shredder on the right.
+  compact: {
+    label: 'Passe ses notes à la broyeuse',
+    fps: 5,
+    loop: true,
+    frames: frames(8, (f, i) => {
+      const p = clawd(f, {
+        eyes: ['left', 'right', 'down', 'down', 'happy', 'happy', 'open', 'closed'][i],
+        left: 'low',
+        right: i >= 1 && i <= 3 ? 'mid' : 'out',
+      });
+      stamp(p, -5, 6, STACK);
+      stamp(p, 17, 4, SHREDDER);
+      // The sheet goes down into the slot, row 4: only what is still above it shows.
+      const top = [null, -2, 0, 2][i] ?? null;
+      if (top !== null) PAPER.forEach((row, j) => top + j < 4 && stamp(p, 18, top + j, [row]));
+      if (i === 4) for (const [x, y] of [[19, 2], [21, 1], [20, 3], [22, 2]]) p(x, y, (x + y) % 2 ? 'L' : 'W');
+      if (i === 5) for (const [x, y] of [[19, 0], [22, 0], [20, 1]]) p(x, y, 'L');
     }),
   },
 
@@ -664,6 +692,46 @@ export const ANIMS = {
       else mug(p, 18, 3 + (nod ? 1 : 0), i);
     }),
   },
+  // A tool failed: startled, a red cross pops up, then a puzzled look around.
+  oops: {
+    label: 'Oups, erreur',
+    fps: 7,
+    loop: false,
+    frames: frames(10, (f, i) => {
+      const jump = i === 1 || i === 2;
+      const p = clawd(f, {
+        dy: jump ? -2 : 0,
+        eyes: i <= 3 ? 'wide' : ['left', 'right', 'left', 'open', 'closed', 'open'][i - 4],
+        left: jump ? 'high' : i >= 4 && i <= 7 ? 'mid' : 'out',
+        right: jump ? 'high' : i >= 4 && i <= 7 ? 'mid' : 'out',
+        legs: jump ? 'tuck' : 'stand',
+      });
+      if (i >= 1 && i <= 7) stamp(p, 13, -10 + (jump ? 2 : 0), OOPS);
+      // A wisp of smoke over the head once the cross is gone.
+      if (i >= 8) for (const [x, y] of [[8, -2], [9, -3], [10, -4]].slice(0, i - 6)) p(x, y, 'G');
+    }),
+  },
+  // Long hours at the desk: a yawn and a stretch, arms up on tiptoe.
+  stretch: {
+    label: 'Bâille et s\'étire',
+    fps: 4,
+    loop: false,
+    frames: frames(12, (f, i) => {
+      const up = i >= 2 && i <= 6;
+      const p = clawd(f, {
+        dy: up ? -1 : 0,
+        eyes: up || i === 7 ? 'closed' : i === 10 ? 'closed' : 'open',
+        left: up ? 'high' : i === 7 ? 'lift' : 'out',
+        right: up ? 'high' : i === 7 ? 'lift' : 'out',
+        legs: up ? 'tuck' : 'stand',
+      });
+      // The yawn: a mouth that opens wide, then closes.
+      if (i >= 2 && i <= 7) {
+        const wide = i >= 3 && i <= 5;
+        stamp(p, 8, 5, wide ? ['EEE', 'EEE'] : ['.E.']);
+      }
+    }),
+  },
   // Watching a game from the side, facing it.
   cheer: {
     label: 'Encourage',
@@ -782,6 +850,7 @@ export const GROUPS = [
       ['type-laptop', 'Quand tous les bureaux sont pris'],
       ['type-side', 'Aux bureaux de côté (le bureau fait partie du décor)'],
       ['search', 'Read, Grep, Glob'],
+      ['compact', 'Compaction du contexte (PreCompact jusqu\'à PostCompact)'],
       ['read', 'Read, Grep, Glob, en alternance avec l\'enquête'],
       ['globe', 'WebFetch, WebSearch, outils MCP'],
       ['think', 'Prompt reçu (UserPromptSubmit), délégation à un subagent'],
@@ -833,6 +902,8 @@ export const GROUPS = [
       ['celebrate', 'Stop après un travail'],
       ['high-five', 'Stop après un travail, avec un Clawd au repos à côté'],
       ['handoff', 'SubagentStop : le subagent rejoint son agent principal'],
+      ['oops', 'PostToolUseFailure : un outil a échoué (pas une annulation)'],
+      ['stretch', 'Au bureau après 10 min de travail d\'affilée, de temps en temps'],
       ['leave', 'SubagentStop, SessionEnd'],
     ],
   },

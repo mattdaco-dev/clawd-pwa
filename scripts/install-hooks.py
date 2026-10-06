@@ -14,7 +14,7 @@ HOOK = str(Path(__file__).resolve().parent.parent / "hooks" / "clawd-hook.sh")
 TOOL_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest"]
 OTHER_EVENTS = [
     "SessionStart", "SessionEnd", "UserPromptSubmit", "Notification",
-    "Stop", "StopFailure", "SubagentStart", "SubagentStop",
+    "Stop", "StopFailure", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact",
 ]
 
 

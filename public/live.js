@@ -33,7 +33,14 @@ const WORK = {
   search: { station: 'shelf', anims: ['search', 'read'] },
   web: { station: 'shelf', anims: ['globe'] },
   think: { station: 'board', anims: ['think'] },
+  // Where it stands: the notes go through a shredder it brings along.
+  compact: { station: null, anims: ['compact'] },
 };
+// Long stretches of work: a yawn at the desk now and then, a coffee every half hour.
+const STRETCH_AFTER = 10 * 60_000;
+const STRETCH_CHANCE = 0.15;
+const BREAK_EVERY = 30 * 60_000;
+const BREAK = { station: 'coffee', anims: ['coffee'] };
 const WAIT = { station: 'front', anims: ['flag', 'bubble', 'wave'] };
 const SLEEP = { station: 'beanbag', anims: ['sleep'] };
 const IDLE = [
@@ -179,13 +186,29 @@ class Critter {
     if (this.locked && !this.finished(now)) return;
     this.locked = false;
 
+    // A tool just failed: a one-off « oops », unless busy walking or playing.
+    if (this.errorSeen === undefined) this.errorSeen = agent.errorAt;
+    if (agent.errorAt && agent.errorAt !== this.errorSeen) {
+      this.errorSeen = agent.errorAt;
+      if (!this.target && !this.duo) return this.play('oops', 1, true);
+    }
+
+    // On a coffee break, new tools do not call it back to work; only a change of state does.
+    if (this.onBreak && agent.state === 'working' && this.state === 'working') this.activity = agent.activity;
+
     if (agent.state !== this.state || agent.activity !== this.activity) {
       this.duo?.quit(this);
       this.replan = false; // decided right below
       const wasWorking = this.state === 'working';
       this.state = agent.state;
       this.activity = agent.activity;
-      if (agent.state === 'idle') this.idleSince = now;
+      if (agent.state === 'idle') {
+        this.idleSince = now;
+        this.workingSince = null;
+        this.lastBreak = null;
+      }
+      // Waiting for an answer does not end a stretch of work; going idle does.
+      if (agent.state === 'working' && !this.workingSince) this.workingSince = now;
       if (wasWorking && agent.state === 'idle') {
         this.target = null;
         this.justDone = now; // the scene may turn this into a high five
@@ -209,7 +232,15 @@ class Critter {
   }
 
   planFor(now) {
-    if (this.state === 'working') return WORK[this.activity] ?? WORK.type;
+    this.onBreak = false;
+    if (this.state === 'working') {
+      if (this.workingSince && now - (this.lastBreak ?? this.workingSince) > BREAK_EVERY && this.activity !== 'compact') {
+        this.lastBreak = now;
+        this.onBreak = true;
+        return BREAK;
+      }
+      return WORK[this.activity] ?? WORK.type;
+    }
     if (this.state === 'waiting') return WAIT;
     if (now - this.idleSince > sleepAfter()) return SLEEP;
     return weighted(IDLE);
@@ -234,9 +265,12 @@ class Critter {
 
   perform() {
     const anims = this.slot?.anims ?? (!this.slot && this.plan.loose ? this.plan.loose : this.plan.anims);
-    const name = pick(anims);
+    let name = pick(anims);
+    // Tired after a while at the keyboard: a yawn and a stretch, then back to it.
+    const typing = this.plan === WORK.type;
+    if (typing && this.workingSince && performance.now() - this.workingSince > STRETCH_AFTER && Math.random() < STRETCH_CHANCE) name = 'stretch';
     if (this.slot) this.dir = this.slot.dir;
-    this.play(name, name === 'sleep' ? Infinity : name === 'breathe' ? 1 : CYCLES[this.state]);
+    this.play(name, name === 'sleep' ? Infinity : name === 'breathe' || name === 'stretch' ? 1 : CYCLES[this.state]);
   }
 
   walkTo(spot, zone) {
@@ -737,9 +771,9 @@ function nearbySpot(critter, zone) {
 function agentsOf(snapshot) {
   const agents = [];
   snapshot.sessions.forEach((s, zone) => {
-    agents.push({ key: s.id, kind: 'main', label: s.name || s.id.slice(0, 8), state: s.state, activity: s.activity, zone });
+    agents.push({ key: s.id, kind: 'main', label: s.name || s.id.slice(0, 8), state: s.state, activity: s.activity, errorAt: s.errorAt, zone });
     for (const sub of s.subagents) {
-      agents.push({ key: `${s.id}/${sub.id}`, parent: s.id, kind: 'sub', label: sub.type, state: sub.state, activity: sub.activity, zone });
+      agents.push({ key: `${s.id}/${sub.id}`, parent: s.id, kind: 'sub', label: sub.type, state: sub.state, activity: sub.activity, errorAt: sub.errorAt, zone });
     }
   });
   return agents;
