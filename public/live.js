@@ -82,7 +82,7 @@ class Critter {
 
   // The office was rebuilt: forget the old places and pick new ones.
   relocate() {
-    this.duo?.end(false);
+    this.duo?.quit(this);
     this.slot = null;
     this.plan = null;
     this.target = null;
@@ -92,7 +92,7 @@ class Critter {
   // A finished subagent walks up to its main agent and hands its report over
   // before vanishing; gives up after a while if the main agent keeps moving.
   handOver(parent, now) {
-    this.duo?.end(false);
+    this.duo?.quit(this);
     this.release();
     this.delivering = { parent, until: now + DELIVERY_MS };
     this.locked = false;
@@ -124,7 +124,7 @@ class Critter {
     if (this.leaving) return;
     this.delivering = null;
     this.leaving = true;
-    this.duo?.end(false);
+    this.duo?.quit(this);
     this.release();
     this.target = null;
     this.play('leave', 1, true);
@@ -143,7 +143,7 @@ class Critter {
     this.locked = false;
 
     if (agent.state !== this.state || agent.activity !== this.activity) {
-      this.duo?.end(false);
+      this.duo?.quit(this);
       this.replan = false; // decided right below
       const wasWorking = this.state === 'working';
       this.state = agent.state;
@@ -227,7 +227,7 @@ class Critter {
       this.play('breathe', Infinity);
     } else if (this.duo) {
       this.dir = this.duoDir;
-      this.play(this.duo.ready, Infinity);
+      this.play(this.watching ? 'cheer' : this.duo.ready, Infinity);
     } else {
       this.perform();
     }
@@ -261,6 +261,7 @@ class Critter {
 class Duo {
   constructor(players, slots) {
     this.players = players;
+    this.watchers = [];
     this.slots = slots;
     for (const slot of slots) slot.occupant = this;
     const spots = this.spots(slots);
@@ -283,11 +284,45 @@ class Duo {
     this.play(now);
   }
 
+  // A third Clawd comes to watch from beside one of the players.
+  watch(c) {
+    const side = this.watchers.some((w) => w.watchSide === 1) ? -1 : 1;
+    const outer = side > 0 ? this.players[1] : this.players[0];
+    c.release();
+    c.plan = null;
+    c.duo = this;
+    c.watching = true;
+    c.watchSide = side;
+    c.duoDir = -side;
+    this.watchers.push(c);
+    c.walkTo({ x: outer.x + side * 28 * c.scale, y: outer.y + 6 * c.scale }, c.zone);
+  }
+
+  // Someone is called away: a watcher just leaves, a player ends the game.
+  quit(c) {
+    if (!c.watching) return this.end(false);
+    this.watchers = this.watchers.filter((w) => w !== c);
+    c.duo = null;
+    c.watching = false;
+    c.target = null;
+    c.plan = null;
+    c.replan = true;
+  }
+
   // played: the game reached its end; otherwise one of them was called away.
   end(played) {
     if (this.over) return;
     this.over = true;
     for (const slot of this.slots) if (slot.occupant === this) slot.occupant = null;
+    for (const c of this.watchers) {
+      c.duo = null;
+      c.watching = false;
+      c.target = null;
+      c.plan = null;
+      if (c.leaving) continue;
+      if (played) c.play('celebrate', 1, true);
+      else c.replan = true;
+    }
     for (const c of this.players) {
       c.duo = null;
       c.target = null;
@@ -574,6 +609,12 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       lastPairing.set(zone, now);
       if (Math.random() >= PAIR_CHANCE) continue;
       const free = [...critters.values()].filter((c) => c.zone === zone && available(c, now));
+      // A game already on in this zone draws a spectator or two before a new one starts.
+      const game = duos.find((d) => d.started && d.players[0].zone === zone && d.watchers.length < 2);
+      if (game && free.length) {
+        game.watch(pick(free));
+        continue;
+      }
       if (free.length < 2) continue;
       const a = free.splice(Math.floor(Math.random() * free.length), 1)[0];
       const b = free[Math.floor(Math.random() * free.length)];

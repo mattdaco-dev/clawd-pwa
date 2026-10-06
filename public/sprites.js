@@ -544,6 +544,21 @@ export const ANIMS = {
       }
     }),
   },
+  // Watching a game from the side, facing it.
+  cheer: {
+    label: 'Encourage',
+    fps: 6,
+    loop: true,
+    frames: frames(6, (f, i) => {
+      clawd(f, {
+        dy: i === 1 || i === 4 ? -1 : 0,
+        eyes: i % 3 === 2 ? 'right' : 'happy',
+        left: i < 3 ? 'high' : 'out',
+        right: i < 3 ? 'out' : 'high',
+        legs: i === 1 || i === 4 ? 'tuck' : 'stand',
+      });
+    }),
+  },
   // A subagent done with its task hands the report to its main agent (on the right).
   handoff: {
     label: 'Rend son rapport',
@@ -680,6 +695,7 @@ export const GROUPS = [
       ['sword-block', 'Pare l\'attaque'],
       ['sword-win', 'Fin du duel, le dernier à attaquer gagne'],
       ['sword-lose', 'Fin du duel, l\'autre est sonné'],
+      ['cheer', 'Un troisième Clawd regarde une partie, puis applaudit à la fin (Fête ça)'],
       ['sleep', '2 minutes sans activité'],
     ],
   },
