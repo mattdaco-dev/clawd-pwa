@@ -11,19 +11,25 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header>
-    <h1>Clawd</h1>
-    <nav>
+  <div class="menu">
+    <button type="button" class="menu-button" aria-label="Menu" aria-expanded="false" aria-controls="menu-nav">
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <nav id="menu-nav" hidden>
       <a href="#/" data-view="live">Live</a>
+      <a href="#/demo" data-view="demo">Démo</a>
       <a href="#/galerie" data-view="galerie">Galerie</a>
     </nav>
-  </header>
-  <main>
-    <section id="live" hidden></section>
-    <section id="gallery" hidden>
-      <p class="intro">Toutes les animations, regroupées par activité de l'agent. À gauche le Clawd du main, à droite celui d'un subagent.</p>
-    </section>
-  </main>
+  </div>
+
+  <section id="live" class="scene" hidden></section>
+  <section id="demo" class="scene" hidden></section>
+  <section id="gallery" hidden>
+    <p class="intro">Toutes les animations, regroupées par activité de l'agent. À gauche le Clawd du main, à droite celui d'un subagent.</p>
+  </section>
+
   <script type="module" src="/app.js"></script>
 </body>
 </html>

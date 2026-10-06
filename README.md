@@ -23,8 +23,8 @@ Le service écrit le chemin absolu de `node` dans le plist (launchd ne voit pas 
 `install-service.py` après un changement de version de Node. Journal du serveur : `logs/server.log`.
 
 Ouvrir http://localhost:4777 dans Chrome, puis « Installer l'application » pour en faire une PWA.
-La case « Démo » de la vue Live joue un scénario sans Claude Code ; la vue Galerie montre toutes
-les animations regroupées par activité.
+Le bouton rond en haut à gauche ouvre le menu : Live (les vraies sessions), Démo (un scénario en
+boucle sans Claude Code) et Galerie (toutes les animations regroupées par activité).
 
 Le hook garde une copie brute de chaque payload dans `logs/events.jsonl` (5 Mo max, `CLAWD_LOG=0`
 pour couper). Il ne bloque jamais Claude : sortie vide, code 0, envoi au serveur détaché.
@@ -34,4 +34,4 @@ pour couper). Il ne bloque jamais Claude : sortie vide, code 0, envoi au serveur
 - `hooks/clawd-hook.sh` : hook Claude Code, transmet le payload au serveur.
 - `server.js` : traduit les événements en état par agent (`working`, `waiting`, `idle`) et le diffuse en SSE.
 - `public/sprites.js` : toutes les animations, en grilles de pixels composées par code.
-- `public/live.js`, `public/gallery.js` : les deux vues.
+- `public/live.js` : la scène plein écran (vues Live et Démo), `public/gallery.js` : la galerie.

@@ -38,46 +38,74 @@ body {
   font: 15px/1.5 system-ui, sans-serif;
 }
 
-header {
+.menu {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+}
+
+.menu-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.15);
+}
+
+.menu nav {
   display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
+  flex-direction: column;
+  min-width: 140px;
+  margin-top: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
 }
 
-h1 {
-  margin: 0;
-  font-size: 18px;
-  color: var(--accent);
+.menu nav[hidden] {
+  display: none;
 }
 
-nav {
-  display: flex;
-  gap: 4px;
-}
-
-nav a {
-  padding: 4px 12px;
+.menu nav a {
+  padding: 6px 10px;
   border-radius: 6px;
-  color: var(--muted);
+  color: var(--text);
   text-decoration: none;
 }
 
-nav a[aria-current] {
+.menu nav a:hover {
   background: var(--line);
-  color: var(--text);
 }
 
-main {
-  padding: 16px;
-  max-width: 1200px;
-  margin: 0 auto;
+.menu nav a[aria-current] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.scene {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.scene[hidden] {
+  display: none;
 }
 
 .stage {
+  flex: 1;
+  min-height: 0;
   background: var(--stage);
-  border-radius: 12px;
   overflow: hidden;
 }
 
@@ -87,9 +115,8 @@ main {
 
 .live-bar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-top: 8px;
+  padding: 6px 12px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -110,6 +137,12 @@ main {
 
 .status[data-state="demo"]::before {
   background: var(--accent);
+}
+
+#gallery {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 64px 16px 16px;
 }
 
 .intro,
