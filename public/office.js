@@ -180,8 +180,81 @@ const BOARD = sprite([
   '..GGGGGGGGGGGGGGGGGGGG..',
 ]);
 
-const WINDOW = sprite(Array.from({ length: 14 }, (_, y) =>
-  y === 0 || y === 13 || y === 6 ? 'W'.repeat(20) : `W${'S'.repeat(8)}WW${'S'.repeat(8)}W`));
+// Window shapes: F is the frame, S the glass repainted with the sky of the hour.
+// Each room or open space draws one shape and one frame colour for all its windows.
+const WINDOW_SHAPES = [
+  // Classic, four panes.
+  Array.from({ length: 14 }, (_, y) => (y === 0 || y === 13 || y === 6 ? 'F'.repeat(20) : `F${'S'.repeat(8)}FF${'S'.repeat(8)}F`)),
+  // Wide, three panes.
+  Array.from({ length: 12 }, (_, y) => (y === 0 || y === 11 ? 'F'.repeat(28) : `F${'S'.repeat(8)}F${'S'.repeat(8)}F${'S'.repeat(8)}F`)),
+  // Tall and narrow, with a transom.
+  Array.from({ length: 18 }, (_, y) => (y === 0 || y === 6 || y === 17 ? 'F'.repeat(10) : `F${'S'.repeat(8)}F`)),
+  // Workshop glazing, small panes.
+  Array.from({ length: 16 }, (_, y) => (y % 5 === 0 ? 'F'.repeat(22) : `F${'S'.repeat(6)}F${'S'.repeat(6)}F${'S'.repeat(6)}F`)),
+  // Arched top.
+  [
+    '.....FFFFF.....',
+    '...FFSSFSSFF...',
+    '..FSSSSFSSSSF..',
+    '.FSSSSSFSSSSSF.',
+    '.FSSSSSFSSSSSF.',
+    ...Array.from({ length: 4 }, () => 'FSSSSSSFSSSSSSF'),
+    'F'.repeat(15),
+    ...Array.from({ length: 6 }, () => 'FSSSSSSFSSSSSSF'),
+    'F'.repeat(15),
+  ],
+];
+const WINDOW_FRAMES = ['W', 'W', 'K', 'D', 'G'];
+
+// maxCols keeps to the shapes that fit the wall, when one does.
+function windowModel(random, maxCols = Infinity) {
+  const pickOne = (list) => list[Math.floor(random() * list.length)];
+  const frame = pickOne(WINDOW_FRAMES);
+  const fitting = WINDOW_SHAPES.filter((rows) => rows[0].length <= maxCols);
+  const model = sprite(pickOne(fitting.length ? fitting : WINDOW_SHAPES).map((row) => row.replaceAll('F', frame)));
+  model.glass = model.cells.filter(([, , c]) => c === 'S');
+  return model;
+}
+
+// Bottoms line up whatever the shape; returns the window's top.
+const WINDOW_SILL = 14; // distance from the sill to the foot of the wall, at 5 px
+function drawWindow(g, model, left, wall, { p, u, skies }) {
+  const top = wall - u(WINDOW_SILL) - model.h * p;
+  drawSprite(g, model, left, top, p);
+  skies.push({ left: Math.round(left), top: Math.round(top), model });
+}
+
+// The way in, one per room or open space: a door at the foot of the wall,
+// a mat on the floor and, in the open space, a green exit sign above it.
+const DOOR = sprite([
+  'DDDDDDDDDDDD',
+  'DOOOOOOOOOOD',
+  'DOLLLLLLLLOD',
+  'DOLLLLLLLLOD',
+  'DOLLLLLLLLOD',
+  'DOLLLLLLLLOD',
+  'DOOOOOOOOOOD',
+  'DOOOOOOOOOOD',
+  'DODDDDDDDDOD',
+  'DODOOOOOODOD',
+  'DODOOOOOODYD',
+  'DODOOOOOODOD',
+  'DODOOOOOODOD',
+  'DODOOOOOODOD',
+  'DODDDDDDDDOD',
+  'DOOOOOOOOOOD',
+  'DDDDDDDDDDDD',
+]);
+const EXIT_SIGN = sprite(['PPPPPP', 'PWPPWP', 'PPPPPP']);
+const doorWidth = (p) => DOOR.w * p;
+
+function drawDoor(g, left, wall, { p, u, sign = true }) {
+  const top = wall + u(4) - DOOR.h * p;
+  drawSprite(g, DOOR, left, top, p);
+  if (sign) drawSprite(g, EXIT_SIGN, left + 3 * p, top - 4 * p, p);
+  g.fillStyle = INK.H;
+  g.fillRect(Math.round(left - u(6)), Math.round(wall + u(6)), Math.round(DOOR.w * p + u(12)), Math.round(u(9)));
+}
 
 // Ambiances: a wall, a floor and the fabrics, rug colours and pots that go
 // with them. Each room draws one; everything in the room follows it.
@@ -918,22 +991,20 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
     }
   };
 
-  // Along the wall, left: maybe a plant, bookshelves, the whiteboard.
+  // Along the wall, left: the door in the corner, bookshelves, the whiteboard.
   const backBase = wall + u(16);
   const inFront = backBase + u(36);
   let cursor = x0 + u(24);
-  if (chance(0.7)) {
-    const plant = look.plant();
-    standing(plant, cursor, backBase);
-    cursor += plant.w * p + u(12);
-  }
-  const shelfCount = int(1, W >= u(760) ? 3 : W >= u(560) ? 2 : 1);
+  drawDoor(g, cursor, wall, { p, u, sign: false });
+  cursor += doorWidth(p) + u(20);
+  const shelfCount = int(1, W >= u(900) ? 3 : W >= u(560) ? 2 : 1);
+  const firstShelf = cursor;
   for (let i = 0; i < shelfCount; i++) {
     standing(look.shelf(), cursor, backBase);
     slot('shelf', cursor + u(40), inFront);
     cursor += SHELF.w * p + u(int(6, 16));
   }
-  const boardLeft = cursor + u(between(30, 90));
+  const boardLeft = cursor + u(between(30, 60));
   // A floor lamp in the gap between the shelves and the whiteboard, for both.
   const reading = floorLamp((cursor + boardLeft) / 2 - (LAMP.w * p) / 2, backBase, p);
   standing(LAMP, reading.lamp.left, backBase);
@@ -943,32 +1014,40 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
   slot('board', boardLeft + u(30), wall + u(44), 0, { light: reading });
   slot('board', boardLeft + u(120), wall + u(44), 0, { light: reading });
 
-  // Along the wall, right: coffee corner, maybe a water cooler and a plant, the clock.
+  // Along the wall, right: coffee corner, maybe a plant if a window still fits.
+  const winFrom = boardLeft + BOARD.w * p + u(40);
   let right = x1 - u(28) - COUNTER.w * p;
   coffeeCorner(right, backBase, inFront, { g, ceiling: top, lamps, p, u, standing, slot, stations });
-  if (chance(0.75)) {
-    right -= u(20) + COOLER.w * p;
-    standing(COOLER, right, backBase);
-    slot('coffee', right + u(20), inFront);
-  }
-  if (chance(0.5)) {
-    const plant = look.plant();
+  const plant = chance(0.3) ? look.plant() : null;
+  if (plant && right - u(46) - plant.w * p - winFrom >= 10 * p + u(20)) {
     right -= u(16) + plant.w * p;
     standing(plant, right, backBase);
   }
   slot('coffee', right - u(70), inFront);
-  if (chance(0.85)) clocks.push({ x: right - u(between(30, 80)), y: top + Math.round(wallH * between(0.4, 0.55)) });
+  const withClock = chance(0.85);
   reserve(x0, wall, W, u(60));
 
-  const winFrom = boardLeft + BOARD.w * p + u(40);
-  const winTo = right - u(120);
-  const room = Math.max(0, Math.floor((winTo - winFrom + u(40)) / u(140)));
-  const windows = Math.max(0, room - int(0, 1));
-  for (let i = 0; i < windows; i++) {
-    const left = winFrom + ((winTo - winFrom - u(100)) * (i + 0.5)) / windows - u(50) + u(between(-12, 12));
-    drawSprite(g, WINDOW, left, wall - u(84), p);
-    skies.push({ left: Math.round(left), top: Math.round(wall - u(84)) });
+  const winTo = right - u(30);
+  // As many windows as fit, of one shape, evenly spaced; the clock in the
+  // widest stretch of bare wall left.
+  const span = winTo - winFrom;
+  const pane = windowModel(random, (span - u(20)) / p);
+  const paneW = pane.w * p;
+  const fit = Math.max(0, Math.floor((span + u(30)) / (paneW + u(30))));
+  const panes = fit >= 2 && chance(0.3) ? fit - 1 : fit;
+  const space = Math.max(0, span - panes * paneW) / (panes + 1);
+  let at = winFrom + space;
+  const bare = [{ x: winFrom + space / 2, w: space }];
+  for (let i = 0; i < panes; i++) {
+    drawWindow(g, pane, at, wall, { p, u, skies });
+    at += paneW;
+    bare.push({ x: at + space / 2, w: space });
+    at += space;
   }
+  const widest = bare.reduce((a, b) => (b.w > a.w ? b : a));
+  if (withClock && widest.w >= u(56)) clocks.push({ x: widest.x, y: top + Math.round(wallH * between(0.4, 0.55)) });
+  // No bare wall wide enough: higher up, over the first bookshelf.
+  else if (withClock) clocks.push({ x: firstShelf + (SHELF.w * p) / 2, y: top + Math.round(wallH * 0.28) });
 
   // Vertical plan: desk rows, then a middle band (meeting table, radio), then the
   // play area at the bottom. Rows are added while they fit; spare height is shared.
@@ -1385,16 +1464,20 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
   // wall pieces in between (a painting, a pin board, the clock) or bare wall.
   const wallFrom = shelfStart + shelves * (SHELF.w * p + u(4)) + u(30);
   const wallTo = kitchen - u(60) - PAINTING.w * p;
-  const winW = WINDOW.w * p;
+  const pane = windowModel(random);
+  const winW = pane.w * p;
   const gaps = []; // middle and width of each stretch of wall between groups
+  let doorX = between(wallFrom + u(40), Math.max(wallFrom + u(40), wallTo - u(120)));
   let wx = wallFrom + u(between(0, 40));
   while (wx + winW <= wallTo) {
-    const n = Math.min(int(1, 3), Math.floor((wallTo - wx + u(8)) / (winW + u(8))));
-    for (let k = 0; k < n; k++) {
-      const left = wx + k * (winW + u(8));
-      drawSprite(g, WINDOW, left, wall - u(84), p);
-      skies.push({ left: Math.round(left), top: Math.round(wall - u(84)) });
+    if (doorX !== null && wx + winW > doorX) {
+      drawDoor(g, wx + u(20), wall, { p, u });
+      wx += u(20) + doorWidth(p) + u(between(40, 90));
+      doorX = null;
+      continue;
     }
+    const n = Math.min(int(1, 3), Math.floor((wallTo - wx + u(8)) / (winW + u(8))));
+    for (let k = 0; k < n; k++) drawWindow(g, pane, wx + k * (winW + u(8)), wall, { p, u, skies });
     wx += n * (winW + u(8));
     const gap = u(between(50, 180));
     gaps.push({ x: wx + gap / 2, w: gap });
@@ -1528,22 +1611,18 @@ const DAY_SKY = [191, 224, 255];
 const DUSK_SKY = [244, 170, 120];
 const NIGHT_SKY = [31, 42, 77];
 
-// Paints the panes of a WINDOW sprite with the sky of the hour, stars at night.
-function drawSky(ctx, { left, top }, index, { night, dusk }, p) {
+// Paints the glass of a window with the sky of the hour, stars at night.
+function drawSky(ctx, { left, top, model }, index, { night, dusk }, p) {
   const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
   // The sky turns dark later than the room, so sunset stays orange.
   const [r, g, b] = mix(mix(DAY_SKY, DUSK_SKY, dusk), NIGHT_SKY, Math.max(0, (night - 0.3) / 0.7));
   ctx.fillStyle = `rgb(${r} ${g} ${b})`;
-  for (const [x0, y0] of [[1, 1], [11, 1], [1, 7], [11, 7]]) {
-    ctx.fillRect(left + x0 * p, top + y0 * p, 8 * p, (y0 === 1 ? 5 : 6) * p);
-  }
+  for (const [x, y] of model.glass) ctx.fillRect(left + x * p, top + y * p, p, p);
   if (night < 0.6) return;
   ctx.fillStyle = '#fff6d6';
   for (let k = 0; k < 3; k++) {
     // The same few stars in each window every night.
-    const n = (index * 7 + k * 13) % 29;
-    const x = [2, 5, 7, 12, 15, 17][n % 6];
-    const y = [2, 3, 4, 8, 10][n % 5];
+    const [x, y] = model.glass[(index * 7 + k * 13 * 11) % model.glass.length];
     ctx.fillRect(left + x * p, top + y * p, p, p);
   }
 }
