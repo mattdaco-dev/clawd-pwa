@@ -253,6 +253,141 @@ const COOLER = sprite([
   'GG....GG',
 ]);
 
+
+// ------------------------------------------------ furniture for the shared office
+
+const SOFA = sprite([
+  '...NNNNNNNNNNNNNNNNNN...',
+  '..NBBBBBBBBNNBBBBBBBBN..',
+  '..NBBBBBBBBNNBBBBBBBBN..',
+  '..NBBBBBBBBNNBBBBBBBBN..',
+  'NNNNNNNNNNNNNNNNNNNNNNNN',
+  'NBBNBBBBBBBBBBBBBBBBNBBN',
+  'NBBNBBBBBBBBBBBBBBBBNBBN',
+  'NNNNNNNNNNNNNNNNNNNNNNNN',
+  '.HH..................HH.',
+]);
+const SOFA_SEAT = 7; // row where a sitting Clawd's feet rest
+
+const ARMCHAIR = sprite([
+  '..NNNNNNN..',
+  '.NBBBBBBBN.',
+  '.NBBBBBBBN.',
+  'NNNNNNNNNNN',
+  'NBNBBBBBNBN',
+  'NBNBBBBBNBN',
+  'NNNNNNNNNNN',
+  '.H.......H.',
+]);
+const ARMCHAIR_SEAT = 6;
+
+const LAMP = sprite([
+  '.YYYY.',
+  'YYYYYY',
+  'YYYYYY',
+  '.KKKK.',
+  ...Array(13).fill('..K...'),
+  '.KKK..',
+]);
+
+const PLANT_TALL = sprite([
+  '....Q.....',
+  '..P.QP.Q..',
+  '.PPQPPQPP.',
+  'PPQPPQPPQP',
+  '.QPPQPPQP.',
+  'PPQPPQPQPP',
+  '.PQPPQPPQ.',
+  'PQPPQPPQPP',
+  '.PPQPPQPP.',
+  '..QPPQPQ..',
+  '...QPPQ...',
+  '....QP....',
+  '....Q.....',
+  '...HHHH...',
+  '..HHHHHH..',
+  '..HHHHHH..',
+  '...HHHH...',
+]);
+
+const LOW_SHELF = sprite([
+  'DDDDDDDDDDDDDDDD',
+  'DRRBYDOOODNGGBND',
+  'DRRBYDOOODNGGBND',
+  'DDDDDDDDDDDDDDDD',
+  'DYNNBDGRRDOOOOOD',
+  'DYNNBDGRRDOOOOOD',
+  'DDDDDDDDDDDDDDDD',
+]);
+const LOW_SHELF_PLANT = sprite([
+  '...........PQ...',
+  '..........PQPQ..',
+  'DDDDDDDDDDDDDDDD',
+  'DRRBYDOOODNGGBND',
+  'DRRBYDOOODNGGBND',
+  'DDDDDDDDDDDDDDDD',
+  'DYNNBDGRRDOOOOOD',
+  'DYNNBDGRRDOOOOOD',
+  'DDDDDDDDDDDDDDDD',
+]);
+
+const PAINTING = sprite([
+  'DDDDDDDDDDDD',
+  'DSSSSSSSSSSD',
+  'DSSSYYSSSSSD',
+  'DSSSYYSSSSSD',
+  'DSSSSSSSPSSD',
+  'DSSSSSSPPPSD',
+  'DPPSSSPPPPPD',
+  'DPPPPPPPPPPD',
+  'DQQQQQQQQQQD',
+  'DDDDDDDDDDDD',
+]);
+
+const FRIDGE = sprite([
+  'AAAAAAAAAA',
+  'AWWWWWWWWA',
+  'AWWWWWWGWA',
+  'AWWWWWWGWA',
+  'AWWWWWWWWA',
+  'AAAAAAAAAA',
+  'AWWWWWWWWA',
+  'AWRWWWWGWA',
+  'AWWWYWWGWA',
+  'AWWWWWWGWA',
+  'AWWWWWWWWA',
+  'AWWWWWWWWA',
+  'AWWWWWWWWA',
+  'AWWWWWWWWA',
+  'AAAAAAAAAA',
+  '.AA....AA.',
+]);
+
+const BIN = sprite([
+  'GGGGG',
+  '.AAA.',
+  '.AGA.',
+  '.AGA.',
+  '.AAA.',
+]);
+
+// The whiteboard on wheels, for the meeting corner.
+const BOARD_STAND = sprite([
+  'GGGGGGGGGGGGGGGGGGGGGGGG',
+  'GWWWWWWWWWWWWWWWWWWWWWWG',
+  'GWBBBWWWWRRWWWWWWWWWWWWG',
+  'GWWWBWWWRWWRWWWBBBBBWWWG',
+  'GWWBWWWWWRRWWWWWWWWWWWWG',
+  'GWBBBBWWWWWWWBBWWWWWWWWG',
+  'GWWWWWWWWWWWBWWBWWNNNWWG',
+  'GWWNNNNNNWWWWBBWWWWWWWWG',
+  'GGGGGGGGGGGGGGGGGGGGGGGG',
+  '...G................G...',
+  '...G................G...',
+  '...G................G...',
+  '..GGG..............GGG..',
+]);
+
 function mirror(s) {
   return { ...s, cells: s.cells.map(([x, y, c]) => [s.w - 1 - x, y, c]) };
 }
@@ -262,6 +397,7 @@ const SIDE_DESK_LEFT = mirror(SIDE_DESK);
 function recolor(s, map) {
   return { ...s, cells: s.cells.map(([x, y, c]) => [x, y, map[c] ?? c]) };
 }
+const FABRICS = [{}, { B: 'R', N: 'D' }, { B: 'Y', N: 'H' }, { B: 'P', N: 'Q' }];
 const BEANBAGS = [BEANBAG, recolor(BEANBAG, { B: 'R', N: 'D' }), recolor(BEANBAG, { B: 'Y', N: 'H' }), recolor(BEANBAG, { B: 'P', N: 'Q' })];
 
 // Seeded generator (mulberry32): a session keeps the same layout across rebuilds.
@@ -488,6 +624,242 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
   return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations };
 }
 
+
+// The shared office, laid out like an interior designer would: library and
+// meeting corner on the left, islands of desks in the middle split by low
+// bookcases, kitchen and lounge on the right, a clear walkway at the front.
+// Structured rather than scattered; the seed only picks variants and fabrics.
+function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
+  const W = x1 - x0;
+  const wallH = u(110);
+  const wall = top + wallH;
+  const floorBottom = bottom - Math.max(20, u(28));
+  const random = seeded('shared-office');
+  const between = (a, b) => a + random() * (b - a);
+  const int = (a, b) => Math.floor(between(a, b + 1));
+  const pickOne = (list) => list[Math.floor(random() * list.length)];
+
+  paintArea(g, x0, top, W, bottom - top, wallH, u);
+
+  const stations = Object.fromEntries(STATIONS.map((type) => [type, []]));
+  const slot = (type, x, y, perScale = 0, { dxPerScale = 0, dir = 1, anims } = {}) => stations[type].push({
+    type,
+    occupant: null,
+    dir,
+    anims,
+    spot: (scale) => ({ x: Math.round(x + dxPerScale * scale), y: Math.round(y + perScale * scale) }),
+  });
+  // `sortAt` overrides the depth used for sorting (seats are drawn behind who sits in them).
+  const prop = (s, left, top, sortAt) => {
+    props.push({ base: Math.round(sortAt ?? top + s.h * p), draw: (ctx) => drawSprite(ctx, s, left, top, p) });
+  };
+  const standing = (s, left, base) => prop(s, left, base - s.h * p);
+  const centered = (s, cx, base) => standing(s, cx - (s.w * p) / 2, base);
+  const fabric = pickOne(FABRICS);
+  const sofa = recolor(SOFA, fabric);
+  const armchair = recolor(ARMCHAIR, fabric);
+
+  const leftW = Math.round(clamp(W * 0.22, u(300), u(460)));
+  const rightW = Math.round(clamp(W * 0.27, u(360), u(540)));
+  const lx1 = x0 + leftW;
+  const rx0 = x1 - rightW;
+  const floorTop = wall + u(30);
+  const walkway = u(130); // kept clear at the front, for agents waiting for input
+  const floorEnd = floorBottom - walkway;
+  const backBase = wall + u(16);
+  const inFront = backBase + u(36);
+
+  // ---- Left: library along the wall, meeting corner, reading corner.
+  standing(PLANT_TALL, x0 + u(16), backBase);
+  const shelfStart = x0 + u(16) + PLANT_TALL.w * p + u(10);
+  const shelves = clamp(Math.floor((lx1 - u(30) - shelfStart) / (SHELF.w * p + u(4))), 1, 4);
+  for (let i = 0; i < shelves; i++) {
+    const left = shelfStart + i * (SHELF.w * p + u(4));
+    standing(SHELF, left, backBase);
+    slot('shelf', left + u(40), inFront);
+  }
+
+  const leftMid = (x0 + lx1) / 2;
+  const tableBase = floorTop + u(170);
+  paintRug(g, leftMid, tableBase - u(18), u(200), u(85), RUGS[1], p);
+  centered(TABLE, leftMid, tableBase);
+  slot('board', leftMid, tableBase - TABLE.h * p + u(12));
+  slot('board', leftMid - u(95), tableBase - u(6));
+  slot('board', leftMid + u(95), tableBase - u(6));
+  const boardBase = tableBase + u(110);
+  centered(BOARD_STAND, leftMid, boardBase);
+  slot('board', leftMid - u(40), boardBase + u(30));
+  slot('board', leftMid + u(40), boardBase + u(30));
+
+  const copyBase = floorEnd - u(10);
+  const readBase = Math.min(Math.max(boardBase + u(190), (boardBase + copyBase) / 2 + u(20)), floorEnd);
+  paintRug(g, x0 + u(150), readBase - u(14), u(270), u(70), RUGS[2], p);
+  standing(LOW_SHELF_PLANT, x0 + u(20), readBase);
+  slot('shelf', x0 + u(60), readBase + u(34));
+  prop(armchair, x0 + u(130), readBase - ARMCHAIR.h * p, readBase - ARMCHAIR.h * p + 2 * p);
+  slot('beanbag', x0 + u(130) + (ARMCHAIR.w * p) / 2, readBase - ARMCHAIR.h * p + ARMCHAIR_SEAT * p);
+  standing(LAMP, x0 + u(195), readBase);
+  if (lx1 - x0 >= u(360)) {
+    prop(armchair, x0 + u(235), readBase - ARMCHAIR.h * p, readBase - ARMCHAIR.h * p + 2 * p);
+    slot('beanbag', x0 + u(235) + (ARMCHAIR.w * p) / 2, readBase - ARMCHAIR.h * p + ARMCHAIR_SEAT * p);
+  }
+
+  // Copy corner, low on the left: printer between filing cabinets.
+  if (copyBase - readBase >= u(150)) {
+    standing(CABINET, x0 + u(24), copyBase);
+    standing(PRINTER, x0 + u(24) + CABINET.w * p + u(14), copyBase);
+    standing(CABINET, x0 + u(24) + CABINET.w * p + PRINTER.w * p + u(28), copyBase);
+    standing(BIN, x0 + u(24) + 2 * CABINET.w * p + PRINTER.w * p + u(42), copyBase);
+  }
+
+  // Divider between the library and the desks: low bookcases, spaced like a hedge.
+  for (let y = floorTop + u(110); y <= floorEnd; y += u(170)) {
+    standing(LOW_SHELF_PLANT, lx1 - (LOW_SHELF.w * p) / 2, y);
+  }
+
+  // ---- Right: kitchen along the wall, lounge in the middle of the zone.
+  let kitchen = x1 - u(20) - FRIDGE.w * p;
+  standing(FRIDGE, kitchen, backBase);
+  slot('coffee', kitchen + u(25), inFront + u(10));
+  kitchen -= u(12) + COFFEE.w * p;
+  standing(COFFEE, kitchen, backBase);
+  slot('coffee', kitchen + u(25), inFront);
+  kitchen -= u(12) + COOLER.w * p;
+  standing(COOLER, kitchen, backBase);
+  slot('coffee', kitchen + u(20), inFront);
+  kitchen -= u(16) + PLANT.w * p;
+  standing(PLANT, kitchen, backBase);
+  drawSprite(g, PAINTING, kitchen - u(30) - PAINTING.w * p, wall - u(90), p);
+
+  const loungeX = (rx0 + x1) / 2;
+  const rugW = Math.min(rightW - u(100), u(300));
+  const rugH = u(90);
+  const rugY = floorTop + (floorEnd - floorTop) * 0.55;
+  paintRug(g, loungeX, rugY, rugW, rugH, pickOne([RUGS[0], RUGS[2]]), p);
+  for (const dx of [-rugW / 3, 0, rugW / 3]) slot('rug', loungeX + dx, rugY + u(10));
+
+  const sofaTop = rugY - rugH / 2 - SOFA.h * p + u(10);
+  prop(sofa, loungeX - (SOFA.w * p) / 2, sofaTop, sofaTop + 2 * p);
+  for (const dx of [-u(30), u(30)]) slot('beanbag', loungeX + dx, sofaTop + SOFA_SEAT * p);
+  standing(LAMP, loungeX - (SOFA.w * p) / 2 - u(40), sofaTop + SOFA.h * p);
+  const radioLeft = loungeX + (SOFA.w * p) / 2 + u(14);
+  standing(RADIO, radioLeft, sofaTop + SOFA.h * p);
+  slot('radio', radioLeft + RADIO.w * p + u(40), sofaTop + SOFA.h * p - u(4));
+  slot('radio', radioLeft + u(30), sofaTop + SOFA.h * p + u(40));
+
+  for (const side of [-1, 1]) {
+    const cx = loungeX + side * (rugW / 2 + u(40));
+    if (cx - (ARMCHAIR.w * p) / 2 < rx0 + u(30) || cx + (ARMCHAIR.w * p) / 2 > x1 - u(10)) continue;
+    const armTop = rugY - (ARMCHAIR.h * p) / 2;
+    prop(armchair, cx - (ARMCHAIR.w * p) / 2, armTop, armTop + 2 * p);
+    slot('beanbag', cx, armTop + ARMCHAIR_SEAT * p);
+  }
+  const bags = int(2, 3);
+  for (let i = 0; i < bags; i++) {
+    const cx = loungeX + (i - (bags - 1) / 2) * u(90);
+    const base = rugY + rugH / 2 + u(70);
+    centered(pickOne(BEANBAGS), cx, base);
+    slot('beanbag', cx, base - 2 * p);
+  }
+
+  // Café corner under the lounge: a table between two armchairs, a plant.
+  const cafeBase = rugY + rugH / 2 + u(230);
+  if (cafeBase <= floorEnd) {
+    centered(TABLE, loungeX, cafeBase);
+    for (const side of [-1, 1]) {
+      const cx = loungeX + side * u(100);
+      const armTop = cafeBase - ARMCHAIR.h * p + u(4);
+      prop(armchair, cx - (ARMCHAIR.w * p) / 2, armTop, armTop + 2 * p);
+      slot('coffee', cx, armTop + ARMCHAIR_SEAT * p);
+    }
+    standing(PLANT_TALL, x1 - u(20) - PLANT_TALL.w * p, cafeBase);
+  }
+
+  // Green divider between the desks and the lounge.
+  for (let y = floorTop + u(120); y <= floorEnd; y += u(150)) standing(PLANT_TALL, rx0 - u(25), y);
+
+  // ---- Middle: islands of 4 or 6 desks, in a grid with aisles.
+  const cx0 = lx1 + u(60);
+  const cx1 = rx0 - u(60);
+  const cw = cx1 - cx0;
+  const pitch = u(60); // between the pairs of desks of an island
+  const islandW = u(290);
+  const aisle = u(80);
+  const cols = Math.max(1, Math.floor((cw + aisle) / (islandW + aisle)));
+  const split = cols >= 3; // low bookcases between the two halves of the plateau
+  const extra = split ? u(70) : 0;
+  const gridW = cols * islandW + (cols - 1) * aisle + extra;
+  const gx0 = cx0 + (cw - gridW) / 2;
+  const colX = (c) => gx0 + c * (islandW + aisle) + (split && c >= Math.ceil(cols / 2) ? extra : 0);
+
+  const ch = floorEnd - floorTop - u(40);
+  const height = (pairs) => (pairs - 1) * pitch + SIDE_DESK.h * p;
+  const rowsPlan = [];
+  let used = 0;
+  for (const pairs of [3, 2, 3]) { // islands of 6, then 4, then 6 seats
+    const need = height(pairs) + u(130);
+    if (used + need > ch) continue;
+    rowsPlan.push(pairs);
+    used += need;
+  }
+  if (!rowsPlan.length) rowsPlan.push(2);
+  const rowGap = (ch - used) / (rowsPlan.length + 1);
+  let y = floorTop + u(60) + rowGap;
+  let lastRowY = y;
+  for (const pairs of rowsPlan.slice(0, -1)) lastRowY += height(pairs) + u(130) + rowGap;
+  for (const pairs of rowsPlan) {
+    for (let c = 0; c < cols; c++) {
+      const leftDesk = colX(c) + u(75);
+      const rightDesk = leftDesk + SIDE_DESK.w * p;
+      for (let k = 0; k < pairs; k++) {
+        const deskTop = y + k * pitch;
+        const keys = deskTop + SIDE_KEYS * p;
+        props.push({ base: keys + 2 * p, draw: (ctx) => drawSprite(ctx, SIDE_DESK, leftDesk, deskTop, p) });
+        props.push({ base: keys + 2 * p, draw: (ctx) => drawSprite(ctx, SIDE_DESK_LEFT, rightDesk, deskTop, p) });
+        slot('desk', leftDesk, keys, 5, { dxPerScale: -4.5, anims: ['type-side'] });
+        slot('desk', rightDesk + SIDE_DESK.w * p, keys, 5, { dxPerScale: 3.5, dir: -1, anims: ['type-side'] });
+      }
+      // At the foot of each island: low bookcases separating it from the next
+      // row, or a plant or a bin after the last one.
+      const foot = y + height(pairs) + u(55);
+      if (pairs !== rowsPlan.at(-1) || y !== lastRowY) {
+        standing(LOW_SHELF_PLANT, rightDesk - LOW_SHELF.w * p, foot);
+        standing(LOW_SHELF, rightDesk, foot);
+      } else {
+        const end = pickOne([PLANT, PLANT, BIN, null]);
+        if (end) centered(end, rightDesk, foot);
+      }
+    }
+    y += height(pairs) + u(130) + rowGap;
+  }
+  if (split) {
+    // Wider central aisle, lined with plants.
+    const sx = colX(Math.ceil(cols / 2)) - aisle / 2 - extra / 2;
+    for (let py = floorTop + u(140); py <= floorEnd; py += u(220)) centered(PLANT, sx, py);
+  }
+
+  // ---- Wall over the plateau: windows in a regular rhythm, the clock in the middle.
+  const wallFrom = shelfStart + shelves * (SHELF.w * p + u(4)) + u(30);
+  const wallTo = kitchen - u(60) - PAINTING.w * p;
+  const span = wallTo - wallFrom;
+  const windows = Math.max(0, Math.floor(span / u(170)));
+  const middle = windows % 2 ? Math.floor(windows / 2) : -1; // odd count: the clock takes the middle spot
+  for (let i = 0; i < windows; i++) {
+    const cx = wallFrom + (span * (i + 0.5)) / windows;
+    if (i === middle) clocks.push({ x: cx, y: top + Math.round(wallH * 0.45) });
+    else drawSprite(g, WINDOW, cx - u(50), wall - u(84), p);
+  }
+  if (middle < 0) clocks.push({ x: wallFrom + span / 2, y: top + Math.round(wallH * 0.45) });
+
+  // ---- Front walkway, framed by two tall plants.
+  standing(PLANT_TALL, x0 + u(16), floorBottom - u(4));
+  standing(PLANT_TALL, x1 - u(16) - PLANT_TALL.w * p, floorBottom - u(4));
+  const fronts = clamp(Math.floor(cw / u(110)), 3, 12);
+  for (let i = 0; i < fronts; i++) slot('front', cx0 + (cw * (i + 0.5)) / fronts, floorBottom - u(2));
+
+  return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations };
+}
+
 function canvasFor(width, height) {
   const canvas = document.createElement('canvas');
   const dpr = window.devicePixelRatio || 1;
@@ -514,7 +886,9 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   if (layout === 'shared') {
     ({ canvas: background } = canvasFor(width, height));
     const g = background.getContext('2d');
-    zones.push(furnish(g, { x0: 0, x1: width, top: 0, bottom: height, name: '', seed: 'shared', maxPerRow: 8, maxRows: 4 }, env));
+    const area = { x0: 0, x1: width, top: 0, bottom: height, name: '', seed: 'shared', maxPerRow: 8, maxRows: 4 };
+    // The designed plan needs room for its three zones; narrow windows keep the generic one.
+    zones.push(width >= u(1300) && height >= u(700) ? furnishShared(g, area, env) : furnish(g, area, env));
   } else {
     const gap = Math.max(24, u(28));
     const roomW = Math.min(u(760), width - 2 * gap);
