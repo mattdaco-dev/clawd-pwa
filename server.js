@@ -1,7 +1,7 @@
 // Local hub: receives Claude Code hook payloads, keeps one state per agent and
 // streams snapshots to the PWA over server-sent events.
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { open, readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -37,13 +37,41 @@ function set(agent, state, activity = null, tool = null) {
   Object.assign(agent, { state, activity, tool, seenAt: Date.now() });
 }
 
+// The directory Claude was launched in: the first cwd recorded in the session
+// transcript. The cwd of hook payloads follows the session's later `cd`s.
+async function launchDir(transcriptPath) {
+  try {
+    const file = await open(transcriptPath);
+    try {
+      const { buffer, bytesRead } = await file.read(Buffer.alloc(256 * 1024), 0, 256 * 1024, 0);
+      for (const line of buffer.toString('utf8', 0, bytesRead).split('\n')) {
+        try {
+          const entry = JSON.parse(line);
+          if (entry.cwd) return entry.cwd;
+        } catch {}
+      }
+    } finally {
+      await file.close();
+    }
+  } catch {}
+  return null;
+}
+
 function sessionFor(p) {
   let s = sessions.get(p.session_id);
   if (!s) {
-    s = { id: p.session_id, name: '', state: 'idle', activity: null, tool: null, subagents: new Map() };
+    // Named after the current cwd until the transcript gives the launch directory.
+    s = { id: p.session_id, name: basename(p.cwd ?? ''), state: 'idle', activity: null, tool: null, subagents: new Map() };
     sessions.set(s.id, s);
+    if (p.transcript_path) {
+      launchDir(p.transcript_path).then((dir) => {
+        if (dir && sessions.get(s.id) === s && basename(dir) !== s.name) {
+          s.name = basename(dir);
+          broadcast();
+        }
+      });
+    }
   }
-  if (p.cwd) s.name = basename(p.cwd);
   s.seenAt = Date.now();
   return s;
 }
