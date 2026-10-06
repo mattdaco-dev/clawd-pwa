@@ -125,7 +125,10 @@ async function serveStatic(pathname, res) {
   if (!file.startsWith(PUBLIC)) return res.writeHead(403).end();
   try {
     const body = await readFile(file);
-    res.writeHead(200, { 'Content-Type': MIME[extname(file)] ?? 'application/octet-stream' }).end(body);
+    // no-cache: the browser revalidates, so edits show up on the next reload.
+    res
+      .writeHead(200, { 'Content-Type': MIME[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' })
+      .end(body);
   } catch {
     res.writeHead(404).end();
   }

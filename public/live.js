@@ -1,20 +1,31 @@
-import { ANIMS, FRAME_H, FRAME_W } from './sprites.js';
+import { ANIMS, FRAME_H } from './sprites.js';
 import { PALETTES, cycleDone, drawFrame, fitCanvas, frameIndex } from './render.js';
+import { buildOffice, drawClock } from './office.js';
 
 const SCALE = { main: 5, sub: 4 };
 const FEET = FRAME_H - 1; // rows from the top of a frame down to below the feet
-const LABEL_SPACE = 28; // under the lowest feet line, for the agent names
-const WALK_SPEED = 7; // sprite pixels per second
+const CENTER = 15.5; // frame column under the middle of Clawd's body
+const HALF_BODY = 10; // body half-width in sprite pixels, arms included
+const WALK_SPEED = 7; // sprite pixels per second, at least
+const MAX_TRIP = 3; // seconds; long trips walk faster
 const SLEEP_AFTER = 120_000;
 
-const WORK_ANIMS = {
-  type: ['type-front', 'type-laptop'],
-  search: ['search'],
-  web: ['web'],
-  think: ['think'],
+// Where each state happens in the office, and what is played once there.
+// `loose` replaces `anims` when every place at the station is taken.
+const WORK = {
+  type: { station: 'desk', anims: ['type-front'], loose: ['type-front', 'type-laptop'] },
+  search: { station: 'shelf', anims: ['search'] },
+  web: { station: 'radio', anims: ['web'] },
+  think: { station: 'board', anims: ['think'] },
 };
-const WAIT_ANIMS = ['flag', 'bubble', 'wave'];
-const IDLE_ANIMS = [['walk', 35], ['breathe', 20], ['look', 15], ['jump', 10], ['dance', 10], ['ball', 10]];
+const WAIT = { station: 'front', anims: ['flag', 'bubble', 'wave'] };
+const SLEEP = { station: 'beanbag', anims: ['sleep'] };
+const IDLE = [
+  [{ station: null, wander: true, anims: ['breathe', 'look'] }, 40],
+  [{ station: 'coffee', anims: ['breathe', 'look'] }, 25],
+  [{ station: 'rug', anims: ['ball', 'dance', 'jump'] }, 35],
+];
+const CYCLES = { working: 4, waiting: 3, idle: 2 };
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -25,7 +36,7 @@ function weighted(list) {
   return list[0][0];
 }
 
-// A Clawd on the floor: x is the left edge of its frame, y the line under its feet.
+// A Clawd in the office: x is the middle of its body, y the line under its feet.
 class Critter {
   constructor(kind, x, y) {
     this.kind = kind;
@@ -36,11 +47,10 @@ class Critter {
     this.state = null;
     this.activity = null;
     this.idleSince = performance.now();
+    this.plan = null;
+    this.slot = null;
+    this.target = null;
     this.play('arrive', 1, true);
-  }
-
-  get width() {
-    return FRAME_W * this.scale;
   }
 
   play(name, cycles = 1, locked = false) {
@@ -54,79 +64,114 @@ class Critter {
     return cycleDone(ANIMS[this.anim], now - this.t0, this.cycles);
   }
 
+  release() {
+    if (this.slot) this.slot.occupant = null;
+    this.slot = null;
+  }
+
+  // The office was rebuilt: forget the old places and pick new ones.
+  relocate() {
+    this.slot = null;
+    this.plan = null;
+    this.target = null;
+    this.replan = true;
+  }
+
   leave() {
     if (this.leaving) return;
     this.leaving = true;
+    this.release();
+    this.target = null;
     this.play('leave', 1, true);
   }
 
   update(now, dt, agent, zone) {
-    this.x = clamp(this.x, zone.x0, zone.x1 - this.width);
+    const half = HALF_BODY * this.scale;
+    this.x = clamp(this.x, zone.x0 + half, zone.x1 - half);
     this.y = clamp(this.y, zone.y0, zone.y1);
     if (this.leaving) {
       if (this.finished(now)) this.dead = true;
       return;
     }
     if (this.locked && !this.finished(now)) return;
+    this.locked = false;
 
     if (agent.state !== this.state || agent.activity !== this.activity) {
       const wasWorking = this.state === 'working';
       this.state = agent.state;
       this.activity = agent.activity;
       if (agent.state === 'idle') this.idleSince = now;
-      if (wasWorking && agent.state === 'idle') return this.play('celebrate', 1, true);
-      // Head somewhere new before starting the activity, so the scene spreads out.
-      if (agent.state !== 'idle') return this.walkTo(this.nearbySpot(zone));
-      this.choose(now, zone);
-      return;
+      if (wasWorking && agent.state === 'idle') {
+        this.target = null;
+        return this.play('celebrate', 1, true);
+      }
+      return this.decide(now, zone);
     }
 
-    if (this.anim === 'walk') this.walk(now, dt, zone);
-    else if (this.finished(now)) this.choose(now, zone);
+    if (this.replan) {
+      this.replan = false;
+      this.decide(now, zone);
+    } else if (this.target) {
+      this.walk(dt);
+    } else if (this.finished(now)) {
+      this.decide(now, zone);
+    }
   }
 
-  walk(now, dt, zone) {
+  planFor(now) {
+    if (this.state === 'working') return WORK[this.activity] ?? WORK.type;
+    if (this.state === 'waiting') return WAIT;
+    if (now - this.idleSince > SLEEP_AFTER) return SLEEP;
+    return weighted(IDLE);
+  }
+
+  decide(now, zone) {
+    const plan = this.planFor(now);
+    const stay = plan.station && this.plan?.station === plan.station;
+    this.plan = plan;
+    if (stay) return this.perform();
+
+    this.release();
+    if (plan.station) {
+      this.slot = zone.stations[plan.station].find((s) => !s.occupant) ?? null;
+      if (this.slot) this.slot.occupant = this;
+    }
+    if (this.slot) return this.walkTo(this.slot.spot(this.scale), zone);
+    if (plan.wander) return this.walkTo(randomSpot(zone, this.scale), zone);
+    if (plan.station) return this.walkTo(nearbySpot(this, zone), zone);
+    this.perform();
+  }
+
+  perform() {
+    const anims = !this.slot && this.plan.loose ? this.plan.loose : this.plan.anims;
+    const name = pick(anims);
+    if (this.slot) this.dir = this.slot.dir;
+    this.play(name, name === 'sleep' ? Infinity : name === 'breathe' ? 1 : CYCLES[this.state]);
+  }
+
+  walkTo(spot, zone) {
+    const half = HALF_BODY * this.scale;
+    this.target = { x: clamp(spot.x, zone.x0 + half, zone.x1 - half), y: clamp(spot.y, zone.y0, zone.y1) };
+    const dist = Math.hypot(this.target.x - this.x, this.target.y - this.y);
+    this.speed = Math.max(WALK_SPEED * this.scale, dist / MAX_TRIP);
+    if (Math.abs(this.target.x - this.x) > 1) this.dir = this.target.x > this.x ? 1 : -1;
+    this.play('walk', Infinity);
+  }
+
+  walk(dt) {
     const dx = this.target.x - this.x;
     const dy = this.target.y - this.y;
     const dist = Math.hypot(dx, dy);
-    const step = (WALK_SPEED * this.scale * dt) / 1000;
-    if (dist <= step) {
-      this.x = this.target.x;
-      this.y = this.target.y;
-      this.choose(now, zone);
+    const step = (this.speed * dt) / 1000;
+    if (dist > step) {
+      this.x += (dx / dist) * step;
+      this.y += (dy / dist) * step;
       return;
     }
-    this.x += (dx / dist) * step;
-    this.y += (dy / dist) * step;
-  }
-
-  choose(now, zone) {
-    if (this.state === 'working') return this.play(pick(WORK_ANIMS[this.activity] ?? WORK_ANIMS.type), 4);
-    if (this.state === 'waiting') return this.play(pick(WAIT_ANIMS), 3);
-    if (now - this.idleSince > SLEEP_AFTER) return this.play('sleep', Infinity);
-
-    const next = weighted(IDLE_ANIMS);
-    if (next !== 'walk') return this.play(next, next === 'breathe' ? 1 : 2);
-    this.walkTo({
-      x: zone.x0 + Math.random() * Math.max(0, zone.x1 - this.width - zone.x0),
-      y: zone.y0 + Math.random() * Math.max(0, zone.y1 - zone.y0),
-    });
-  }
-
-  // A random point a few steps away, kept inside the zone.
-  nearbySpot(zone) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 120 + Math.random() * 180;
-    return {
-      x: clamp(this.x + Math.cos(angle) * dist, zone.x0, zone.x1 - this.width),
-      y: clamp(this.y + Math.sin(angle) * dist * 0.6, zone.y0, zone.y1),
-    };
-  }
-
-  walkTo(target) {
-    this.target = target;
-    if (Math.abs(target.x - this.x) > 1) this.dir = target.x > this.x ? 1 : -1;
-    this.play('walk', Infinity);
+    this.x = this.target.x;
+    this.y = this.target.y;
+    this.target = null;
+    this.perform();
   }
 
   draw(ctx, now) {
@@ -137,11 +182,27 @@ class Critter {
     if (frame.length) {
       ctx.fillStyle = 'rgb(61 57 41 / 0.08)';
       ctx.beginPath();
-      ctx.ellipse(x + 15.5 * this.scale, y, 7.5 * this.scale, 1.6 * this.scale, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y, 7.5 * this.scale, 1.6 * this.scale, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    drawFrame(ctx, frame, x, y - FEET * this.scale, this.scale, PALETTES[this.kind], this.dir < 0);
+    const left = Math.round(this.x - CENTER * this.scale);
+    drawFrame(ctx, frame, left, y - FEET * this.scale, this.scale, PALETTES[this.kind], this.dir < 0);
   }
+}
+
+function randomSpot(zone, scale) {
+  const half = HALF_BODY * scale;
+  return {
+    x: zone.x0 + half + Math.random() * Math.max(0, zone.x1 - zone.x0 - 2 * half),
+    y: zone.y0 + Math.random() * Math.max(0, zone.y1 - zone.y0),
+  };
+}
+
+// A few steps away, for when every place at a station is taken.
+function nearbySpot(critter, zone) {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 80 + Math.random() * 120;
+  return { x: critter.x + Math.cos(angle) * dist, y: clamp(critter.y + Math.sin(angle) * dist * 0.6, zone.y0, zone.y1) };
 }
 
 // Flattens a server snapshot into one entry per agent, main agents first.
@@ -156,9 +217,8 @@ function agentsOf(snapshot) {
   return agents;
 }
 
-// Scripted session for trying the scene without Claude Code.
+// Scripted sessions for trying the scene without Claude Code.
 function demoSnapshot(seconds) {
-  const step = Math.floor(seconds / 8) % 6;
   const sub = (id, type, state, activity) => ({ id, type, state, activity });
   const steps = [
     { state: 'idle', activity: null, subs: [] },
@@ -168,8 +228,11 @@ function demoSnapshot(seconds) {
     { state: 'working', activity: 'type', subs: [sub('a2', 'general-purpose', 'waiting', 'bubble')] },
     { state: 'idle', activity: null, subs: [] },
   ];
-  const { state, activity, subs } = steps[step];
-  return { sessions: [{ id: 'demo', name: 'démo', state, activity, subagents: subs }] };
+  const session = (id, name, offset) => {
+    const { state, activity, subs } = steps[(Math.floor(seconds / 8) + offset) % steps.length];
+    return { id, name, state, activity, subagents: subs };
+  };
+  return { sessions: [session('demo', 'démo', 0), session('api', 'api', 3)] };
 }
 
 // One scene: fed by the server snapshots, or by the scripted demo when `demo` is set.
@@ -187,6 +250,8 @@ export function createLive(root, { demo = false } = {}) {
   let ctx;
   let width = 0;
   let height = 0;
+  let office = null;
+  let officeKey = '';
   let raf = 0;
   let last = performance.now();
   const demoStart = performance.now();
@@ -200,7 +265,7 @@ export function createLive(root, { demo = false } = {}) {
   function renderStatus() {
     if (demo) {
       status.dataset.state = 'demo';
-      status.textContent = 'démo · scénario en boucle de 48 s';
+      status.textContent = 'démo · 2 sessions, scénario en boucle de 48 s';
       return;
     }
     const n = snapshot.sessions.length;
@@ -208,29 +273,31 @@ export function createLive(root, { demo = false } = {}) {
     status.textContent = connected ? `connecté · ${n} session${n > 1 ? 's' : ''}` : 'hors ligne';
   }
 
+  // Rebuilds the furniture when the window or the list of sessions changes.
+  function ensureOffice(sessions) {
+    const names = sessions.map((s) => s.name || s.id.slice(0, 8));
+    const key = `${width}x${height}|${names.join('|')}`;
+    if (key === officeKey) return;
+    officeKey = key;
+    office = buildOffice(width, height, names);
+    for (const critter of critters.values()) critter.relocate();
+  }
+
   function tick(now) {
     const dt = Math.min(now - last, 100);
     last = now;
     const current = demo ? demoSnapshot(Math.max(0, now - demoStart) / 1000) : snapshot;
+    ensureOffice(current.sessions);
     const agents = agentsOf(current);
-    const zoneCount = Math.max(1, current.sessions.length);
-    const zoneWidth = width / zoneCount;
-    // Each session gets a column of the floor; the top keeps room for hats and flags.
-    const zoneOf = (i) => ({
-      x0: i * zoneWidth + 8,
-      x1: (i + 1) * zoneWidth - 8,
-      y0: Math.min(FEET * SCALE.main + 16, height - LABEL_SPACE),
-      y1: height - LABEL_SPACE,
-    });
 
     for (const agent of agents) {
+      const zone = office.zones[agent.zone];
       let critter = critters.get(agent.key);
-      const zone = zoneOf(agent.zone);
       if (!critter) {
         const parent = agent.parent && critters.get(agent.parent);
         critter = parent
-          ? new Critter(agent.kind, parent.x + parent.width * (1.2 + Math.random()) * (Math.random() < 0.5 ? -1 : 1), parent.y + (Math.random() - 0.5) * 240)
-          : new Critter(agent.kind, (zone.x0 + zone.x1) / 2 - (FRAME_W * SCALE.main) / 2, (zone.y0 + zone.y1) / 2);
+          ? new Critter(agent.kind, parent.x + (Math.random() < 0.5 ? -1 : 1) * (60 + Math.random() * 60), parent.y + (Math.random() - 0.5) * 120)
+          : new Critter(agent.kind, (zone.x0 + zone.x1) / 2, (zone.y0 + zone.y1) / 2);
         critters.set(agent.key, critter);
       }
       critter.label = agent.label;
@@ -242,22 +309,29 @@ export function createLive(root, { demo = false } = {}) {
     for (const [key, critter] of critters) {
       if (alive.has(key)) continue;
       critter.leave();
-      critter.update(now, dt, critter, critter.zone ?? zoneOf(0));
+      critter.update(now, dt, critter, critter.zone ?? office.zones[0]);
       if (critter.dead) critters.delete(key);
     }
 
-    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(office.background, 0, 0, width, height);
+    const date = new Date();
+    for (const clock of office.clocks) drawClock(ctx, clock, date);
 
-    // Back to front, so whoever stands lower on screen is drawn over the others.
-    const ordered = [...critters.values()].sort((a, b) => a.y - b.y);
-    for (const critter of ordered) critter.draw(ctx, now);
+    // Furniture and Clawds back to front, so whoever stands lower is drawn over the rest.
+    const scene = [
+      ...office.props.map((p) => ({ y: p.base, draw: () => p.draw(ctx) })),
+      ...[...critters.values()].map((c) => ({ y: c.y, draw: () => c.draw(ctx, now) })),
+    ].sort((a, b) => a.y - b.y);
+    for (const item of scene) item.draw();
 
     ctx.textAlign = 'center';
-    for (const critter of ordered) {
+    ctx.textBaseline = 'alphabetic';
+    for (const critter of critters.values()) {
       if (critter.leaving) continue;
-      ctx.font = critter.kind === 'main' ? '600 13px ui-monospace, monospace' : '11px ui-monospace, monospace';
-      ctx.fillStyle = critter.kind === 'main' ? '#3d3929' : '#8f8b82';
-      ctx.fillText(critter.label ?? '', Math.round(critter.x + 15.5 * critter.scale), Math.round(critter.y) + (critter.kind === 'main' ? 20 : 16));
+      const main = critter.kind === 'main';
+      ctx.font = main ? '600 13px ui-monospace, monospace' : '11px ui-monospace, monospace';
+      ctx.fillStyle = main ? '#3d3929' : '#8f8b82';
+      ctx.fillText(critter.label ?? '', Math.round(critter.x), Math.round(critter.y) + (main ? 20 : 16));
     }
 
     if (critters.size === 0) {

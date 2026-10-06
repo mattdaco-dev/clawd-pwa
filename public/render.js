@@ -14,6 +14,12 @@ const INKS = {
   H: '#9a6b3f',
   Y: '#f2c14e',
   S: '#bfe0ff',
+  // Office furniture
+  O: '#d1a06a',
+  D: '#8a5d3b',
+  A: '#b8b3a7',
+  P: '#6aa863',
+  Q: '#3f7a44',
 };
 
 function lighten(hex, amount) {

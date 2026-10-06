@@ -35,3 +35,6 @@ pour couper). Il ne bloque jamais Claude : sortie vide, code 0, envoi au serveur
 - `server.js` : traduit les événements en état par agent (`working`, `waiting`, `idle`) et le diffuse en SSE.
 - `public/sprites.js` : toutes les animations, en grilles de pixels composées par code.
 - `public/live.js` : la scène plein écran (vues Live et Démo), `public/gallery.js` : la galerie.
+- `public/office.js` : le décor open space (une colonne meublée par session) et ses postes : bureau
+  pour taper, bibliothèque pour chercher, radio pour le web, tableau blanc pour réfléchir, avant-scène
+  pour attendre un input, café, tapis de jeu et poufs pour la sieste.
