@@ -544,6 +544,29 @@ export const ANIMS = {
       }
     }),
   },
+  // Dancing with the Clawd on the right, who mirrors the same frames.
+  'duo-dance': {
+    label: 'Danse à deux',
+    fps: 6,
+    loop: true,
+    frames: frames(8, (f, i) => {
+      const moves = [
+        ['out', 'high'], ['mid', 'high'], ['high', 'mid'], ['high', 'out'],
+        ['low', 'mid'], ['mid', 'low'], ['out', 'high'], ['out', 'out'],
+      ];
+      const [left, right] = moves[i];
+      const p = clawd(f, {
+        dx: [0, 1, 1, 0, -1, -1, 0, 0][i],
+        dy: i % 2 ? -1 : 0,
+        eyes: i === 3 ? 'closed' : 'happy',
+        left,
+        right,
+        legs: ['tapR', 'stand', 'tapL', 'stand', 'tapR', 'stand', 'tapL', 'tuck'][i],
+      });
+      // A note floating up over the head.
+      stamp(p, 10 + Math.floor(i / 2), -5 - i, NOTE);
+    }),
+  },
   // High five with the Clawd on the right: reach, slap, hop.
   'high-five': {
     label: 'Tape dans la main',
@@ -712,6 +735,7 @@ export const GROUPS = [
       ['sword-block', 'Pare l\'attaque'],
       ['sword-win', 'Fin du duel, le dernier à attaquer gagne'],
       ['sword-lose', 'Fin du duel, l\'autre est sonné'],
+      ['duo-dance', 'Danse à deux devant une radio'],
       ['cheer', 'Un troisième Clawd regarde une partie, puis applaudit à la fin (Fête ça)'],
       ['sleep', '2 minutes sans activité'],
     ],

@@ -37,6 +37,8 @@ const EXCHANGES = [4, 8]; // sword exchanges before one of them wins
 const DUEL_GAP = 11; // sprite pixels from the middle of the rug to each fencer
 const SPARK_MS = 220;
 const DELIVERY_MS = 8000; // longest walk to hand a report over
+const DANCE_GAP = 12; // sprite pixels from the middle to each dancer
+const DANCE_MS = [6000, 10000];
 const FIVE_GAP = 10; // sprite pixels from the meeting point to each hand
 const FIVE_REACH = 70; // sprite pixels: further away, they celebrate alone
 
@@ -268,6 +270,7 @@ class Duo {
     this.slots = slots;
     for (const slot of slots) slot.occupant = this;
     const spots = this.spots(slots);
+    this.places = spots;
     players.forEach((c, i) => {
       c.release();
       c.locked = false;
@@ -291,7 +294,8 @@ class Duo {
   // A third Clawd comes to watch from beside one of the players.
   watch(c) {
     const side = this.watchers.some((w) => w.watchSide === 1) ? -1 : 1;
-    const outer = side > 0 ? this.players[1] : this.players[0];
+    // From the planned spots: a player may still be stepping around.
+    const outer = side > 0 ? this.places[1] : this.places[0];
     c.release();
     c.locked = false;
     c.plan = null;
@@ -320,12 +324,14 @@ class Duo {
     this.over = true;
     for (const slot of this.slots) if (slot.occupant === this) slot.occupant = null;
     for (const c of this.watchers) {
+      // Only those who got there in time cheer; the others just go on.
+      const arrived = !c.target;
       c.duo = null;
       c.watching = false;
       c.target = null;
       c.plan = null;
       if (c.leaving) continue;
-      if (played) c.play('celebrate', 1, true);
+      if (played && arrived) c.play('celebrate', 1, true);
       else c.replan = true;
     }
     for (const c of this.players) {
@@ -351,6 +357,10 @@ const between = ([lo, hi]) => lo + Math.floor(Math.random() * (hi - lo + 1));
 
 // Passing a ball from the left spot of the rug to the right one and back.
 class BallGame extends Duo {
+  static place(zone, players) {
+    return freeRug(zone, players);
+  }
+
   constructor(players, slots) {
     super(players, slots);
     this.ready = 'pass-ready';
@@ -421,6 +431,10 @@ class BallGame extends Duo {
 // Sword fight in the middle of the rug: exchanges of strike and parry, the
 // last one to attack wins and the other one sits down, dizzy.
 class SwordDuel extends Duo {
+  static place(zone, players) {
+    return freeRug(zone, players);
+  }
+
   constructor(players, slots) {
     super(players, slots);
     this.ready = 'sword-guard';
@@ -521,7 +535,45 @@ class HighFive extends Duo {
   }
 }
 
-const GAMES = [BallGame, SwordDuel];
+// Dancing face to face in front of a radio, in step.
+class DanceDuo extends Duo {
+  static place(zone, players) {
+    return freeRadio(zone, players);
+  }
+
+  constructor(players, slots) {
+    super(players, slots);
+    this.ready = 'breathe';
+    this.until = 0;
+  }
+
+  spots(slots) {
+    const scale = Math.min(...this.players.map((c) => c.scale));
+    const at = slots.map((s) => s.spot(scale));
+    const x = at.reduce((sum, a) => sum + a.x, 0) / at.length;
+    const y = Math.max(...at.map((a) => a.y)) + 14 * scale;
+    return this.players.map((c, i) => ({ x: x + (i === 0 ? -1 : 1) * DANCE_GAP * c.scale, y }));
+  }
+
+  play(now) {
+    if (!this.until) {
+      this.until = now + DANCE_MS[0] + Math.random() * (DANCE_MS[1] - DANCE_MS[0]);
+      for (const c of this.players) {
+        c.dir = c.duoDir;
+        c.play('duo-dance', Infinity);
+        c.t0 = now;
+      }
+      return;
+    }
+    if (now >= this.until) this.end(true);
+  }
+
+  finale(c) {
+    c.play('jump', 1, true);
+  }
+}
+
+const GAMES = [BallGame, SwordDuel, DanceDuo];
 
 // Idle Clawds free to start a game: not walking, not asleep, not already playing.
 function available(critter, now) {
@@ -535,6 +587,16 @@ function freeRug(zone, players) {
   for (let i = 0; i + 2 < spots.length; i += 3) {
     const rug = spots.slice(i, i + 3);
     if (rug.every((s) => !s.occupant || players.includes(s.occupant))) return rug;
+  }
+  return null;
+}
+
+// A radio whose two listening spots are free but for the players (spots come in pairs).
+function freeRadio(zone, players) {
+  const spots = zone.stations.radio ?? [];
+  for (let i = 0; i + 1 < spots.length; i += 2) {
+    const radio = spots.slice(i, i + 2);
+    if (radio.every((s) => !s.occupant || players.includes(s.occupant))) return radio;
   }
   return null;
 }
@@ -670,11 +732,14 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       if (free.length < 2) continue;
       const a = free.splice(Math.floor(Math.random() * free.length), 1)[0];
       const b = free[Math.floor(Math.random() * free.length)];
-      const rug = freeRug(zone, [a, b]);
-      if (!rug) continue;
-      // Whoever stands further left takes the left spot.
-      const Game = pick(GAMES);
-      duos.push(new Game(a.x <= b.x ? [a, b] : [b, a], rug));
+      // Games in random order; the first one with a free place wins. Whoever
+      // stands further left takes the left spot.
+      for (const Game of [...GAMES].sort(() => Math.random() - 0.5)) {
+        const slots = Game.place(zone, [a, b]);
+        if (!slots) continue;
+        duos.push(new Game(a.x <= b.x ? [a, b] : [b, a], slots));
+        break;
+      }
     }
   }
 
