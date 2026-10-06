@@ -49,4 +49,5 @@ clair. Le hook est déclaré `async`, il ne bloque jamais Claude : sortie vide, 
   session) et ses postes : bureau
   pour taper, bibliothèque et globe pour chercher et le web, tableau blanc pour réfléchir, avant-scène
   pour attendre un input, café, radio, tapis de jeu et poufs pour la sieste. Deux Clawd au repos dans
-  la même zone se retrouvent parfois sur un tapis pour une passe de ballon (`Duo` dans `live.js`).
+  la même zone se retrouvent parfois sur un tapis pour une passe de ballon ou un duel à l'épée
+  (`BallGame` et `SwordDuel` dans `live.js`).

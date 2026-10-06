@@ -2,7 +2,7 @@
 // Every frame is composed on a FRAME_W x FRAME_H grid of palette keys, so the
 // same catalog renders the main agent and the lighter subagents. Keys:
 // C body, E eyes, K ink, W white, G gray, L puff, R red, B blue, N navy,
-// H brown, Y yellow, S glass.
+// H brown, Y yellow, S glass, w sword blade.
 
 export const FRAME_W = 32;
 export const FRAME_H = 24;
@@ -127,6 +127,35 @@ function sideClawd(f, { eye = 'open', arm = 'lift' } = {}) {
 }
 
 // --------------------------------------------------------------- accessories
+
+// Kirby-style sword held at (x, y), pointing along one of the eight directions
+// (dx, dy): brown grip and guard, then a cream blade outlined in dark brown.
+// Six cells long so it stays inside the frame when held in front.
+function sword(p, x, y, dx, dy) {
+  const at = (k) => [x + dx * k, y + dy * k];
+  const [px, py] = dx && dy ? [-dy, dx].map(Math.sign) : [-dy, dx];
+  p(...at(0), 'H');
+  const [gx, gy] = at(1);
+  p(gx, gy, 'D');
+  p(gx + px, gy + py, 'D');
+  p(gx - px, gy - py, 'D');
+  // Diagonal blades get a second column so they read as solid, not as a ladder.
+  const blade = [2, 3, 4, 5].flatMap((k) => {
+    const [bx, by] = at(k);
+    return dx && dy ? [[bx, by], [bx + dx, by]] : [[bx, by]];
+  });
+  const onBlade = (cx, cy) => blade.some(([bx, by]) => bx === cx && by === cy);
+  for (const [bx, by] of blade) {
+    for (const [nx, ny] of [[bx + 1, by], [bx - 1, by], [bx, by + 1], [bx, by - 1]]) {
+      if (!onBlade(nx, ny) && !(nx === gx && ny === gy)) p(nx, ny, 'D');
+    }
+  }
+  for (const [bx, by] of blade) p(bx, by, 'w');
+  p(...at(6), 'D');
+}
+
+// Where the sword is held, by right arm position (relative to Clawd).
+const GRIP = { mid: [18, 2], out: [18, 4], high: [17, -3] };
 
 function keyboard(p, flash) {
   for (let x = 2; x <= 16; x++) {
@@ -455,6 +484,65 @@ export const ANIMS = {
       clawd(f, { eyes: 'right', left: 'mid', right: 'mid', legs: i % 2 ? 'tapL' : 'stand' });
     }),
   },
+  // Sword duel, facing right like the ball game. The scene keeps the timing:
+  // « sword-strike » and « sword-block » start together and land on frame 3.
+  'sword-guard': {
+    label: 'En garde',
+    fps: 4,
+    loop: true,
+    frames: frames(4, (f, i) => {
+      const p = clawd(f, { eyes: 'right', right: 'mid', legs: i % 2 ? 'tapL' : 'stand' });
+      sword(p, ...GRIP.mid, 1, -1);
+    }),
+  },
+  'sword-strike': {
+    label: 'Attaque',
+    fps: 10,
+    loop: false,
+    frames: frames(6, (f, i) => {
+      const arm = ['high', 'high', 'mid', 'mid', 'mid', 'mid'][i];
+      const p = clawd(f, { eyes: i === 3 ? 'wide' : 'right', right: arm, legs: i === 3 ? 'tapR' : 'stand' });
+      const [dx, dy] = [[0, -1], [-1, -1], [1, -1], [1, 0], [1, 0], [1, -1]][i];
+      sword(p, ...GRIP[arm], dx, dy);
+    }),
+  },
+  'sword-block': {
+    label: 'Pare',
+    fps: 10,
+    loop: false,
+    frames: frames(6, (f, i) => {
+      const hit = i === 3 || i === 4;
+      const p = clawd(f, { dx: hit ? -1 : 0, eyes: hit ? 'closed' : 'right', right: 'mid' });
+      sword(p, ...GRIP.mid, 0, -1);
+    }),
+  },
+  'sword-win': {
+    label: 'Gagne le duel',
+    fps: 8,
+    loop: false,
+    frames: frames(8, (f, i) => {
+      const air = i >= 2 && i <= 5;
+      const dy = [0, 1, -2, -4, -4, -2, 0, 0][i];
+      const p = clawd(f, { dy, eyes: 'happy', left: air ? 'high' : 'out', right: 'high', legs: i >= 1 && i <= 5 ? 'tuck' : 'stand' });
+      sword(p, ...GRIP.high, 0, -1);
+    }),
+  },
+  'sword-lose': {
+    label: 'Perd le duel',
+    fps: 4,
+    loop: true,
+    frames: frames(4, (f, i) => {
+      const p = clawd(f, { dy: 2, eyes: 'closed', left: 'low', right: 'low', legs: 'sit' });
+      sword(pen(f), 19, 9, 1, 0);
+      // Three dizzy stars turning around the head.
+      for (let k = 0; k < 3; k++) {
+        const angle = ((i / 4) + k / 3) * Math.PI * 2;
+        const x = Math.round(9 + 8 * Math.cos(angle));
+        const y = Math.round(-3 + 2 * Math.sin(angle));
+        for (const [sx, sy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) p(x + sx, y + sy, 'Y');
+      }
+    }),
+  },
   sleep: {
     label: 'Dort',
     fps: 3,
@@ -571,6 +659,11 @@ export const GROUPS = [
       ['ball', 'Jeu'],
       ['pass-throw', 'Passe de ballon, à deux sur un tapis'],
       ['pass-ready', 'Attend que l\'autre renvoie le ballon'],
+      ['sword-guard', 'Duel à l\'épée, à deux sur un tapis'],
+      ['sword-strike', 'Attaque, l\'autre pare en même temps'],
+      ['sword-block', 'Pare l\'attaque'],
+      ['sword-win', 'Fin du duel, le dernier à attaquer gagne'],
+      ['sword-lose', 'Fin du duel, l\'autre est sonné'],
       ['sleep', '2 minutes sans activité'],
     ],
   },

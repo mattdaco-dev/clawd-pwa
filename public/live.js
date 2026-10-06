@@ -33,6 +33,9 @@ const PAIR_EVERY = 3000; // ms between two pairing attempts in a zone
 const PAIR_CHANCE = 0.4;
 const PASSES = [6, 12]; // passes before the game ends, drawn at random
 const BALL_SPEED = 70; // sprite pixels per second
+const EXCHANGES = [4, 8]; // sword exchanges before one of them wins
+const DUEL_GAP = 11; // sprite pixels from the middle of the rug to each fencer
+const SPARK_MS = 220;
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -188,7 +191,7 @@ class Critter {
     this.target = null;
     if (this.duo) {
       this.dir = this.duoDir;
-      this.play('pass-ready', Infinity);
+      this.play(this.duo.ready, Infinity);
     } else {
       this.perform();
     }
@@ -216,47 +219,94 @@ class Critter {
   }
 }
 
-// A ball game between two Clawds on the left and right spots of a rug.
+// A game between two Clawds on a rug, the left one facing right. Subclasses
+// say where they stand (spots), what they show on arrival (ready), how a round
+// goes (play) and how it ends (finale).
 class Duo {
   constructor(players, slots) {
     this.players = players;
     this.slots = slots;
-    this.passes = PASSES[0] + Math.floor(Math.random() * (PASSES[1] - PASSES[0] + 1));
-    this.holder = null;
-    this.ball = null;
     for (const slot of slots) slot.occupant = this;
+    const spots = this.spots(slots);
     players.forEach((c, i) => {
       c.release();
       c.plan = null;
       c.duo = this;
       c.duoDir = i === 0 ? 1 : -1;
-      c.walkTo(slots[i === 0 ? 0 : slots.length - 1].spot(c.scale), c.zone);
+      c.walkTo(spots[i], c.zone);
     });
   }
 
   update(now) {
     if (this.over) return;
-    if (!this.holder) {
-      // Wait until both stand on their spot, then the first one serves.
+    if (!this.started) {
+      // Wait until both stand on their spot.
       if (this.players.some((c) => c.target)) return;
-      return this.serve(this.players[Math.floor(Math.random() * 2)], now);
+      this.started = true;
     }
+    this.play(now);
+  }
+
+  // played: the game reached its end; otherwise one of them was called away.
+  end(played) {
+    if (this.over) return;
+    this.over = true;
+    for (const slot of this.slots) if (slot.occupant === this) slot.occupant = null;
+    for (const c of this.players) {
+      c.duo = null;
+      c.target = null;
+      c.plan = null;
+      if (c.leaving) continue;
+      c.dir = c.duoDir;
+      if (played) this.finale(c);
+      else c.replan = true;
+    }
+  }
+
+  // Back-to-front key for what the game draws itself: in front of both players.
+  get y() {
+    return Math.max(...this.players.map((c) => c.y)) + 1;
+  }
+
+  draw() {}
+}
+
+const between = ([lo, hi]) => lo + Math.floor(Math.random() * (hi - lo + 1));
+
+// Passing a ball from the left spot of the rug to the right one and back.
+class BallGame extends Duo {
+  constructor(players, slots) {
+    super(players, slots);
+    this.ready = 'pass-ready';
+    this.passes = between(PASSES);
+    this.holder = null;
+    this.ball = null;
+  }
+
+  spots(slots) {
+    return this.players.map((c, i) => slots[i === 0 ? 0 : slots.length - 1].spot(c.scale));
+  }
+
+  play(now) {
+    if (!this.holder) return this.serve(this.players[Math.floor(Math.random() * 2)], now);
     if (this.ball) {
-      const t = (now - this.ball.t0) / this.ball.ms;
-      if (t < 1) return;
+      if (now - this.ball.t0 < this.ball.ms) return;
       this.ball = null;
       if (--this.passes <= 0) return this.end(true);
-      return this.serve(this.players.find((c) => c !== this.holder), now);
+      return this.serve(this.other(this.holder), now);
     }
     const anim = ANIMS['pass-throw'];
     if ((now - this.holder.t0) * anim.fps / 1000 < PASS.releaseFrame) return;
     const from = this.holder.hands(PASS.releaseY);
-    const catcher = this.players.find((c) => c !== this.holder);
-    const to = catcher.hands(PASS.catchY);
+    const to = this.other(this.holder).hands(PASS.catchY);
     const scale = Math.min(...this.players.map((c) => c.scale));
     const dist = Math.hypot(to.x - from.x, to.y - from.y);
     this.ball = { from, to, scale, t0: now, ms: Math.max(500, (dist / (BALL_SPEED * scale)) * 1000), arc: dist * 0.35 };
     this.holder.play('pass-ready', Infinity);
+  }
+
+  other(player) {
+    return this.players.find((c) => c !== player);
   }
 
   // The catcher gets the ball: frame 0 of « pass-throw » holds it.
@@ -267,25 +317,13 @@ class Duo {
     player.t0 = now;
   }
 
-  // played: the game reached its last pass; otherwise one of them was called away.
-  end(played) {
-    if (this.over) return;
-    this.over = true;
-    this.ball = null;
-    for (const slot of this.slots) if (slot.occupant === this) slot.occupant = null;
-    for (const c of this.players) {
-      c.duo = null;
-      c.target = null;
-      c.plan = null;
-      if (c.leaving) continue;
-      if (played) c.play('jump', 1, true);
-      else c.replan = true;
-    }
+  finale(c) {
+    c.play('jump', 1, true);
   }
 
-  // Back-to-front key and drawing of the ball in flight.
-  get y() {
-    return Math.max(...this.players.map((c) => c.y)) + 1;
+  end(played) {
+    this.ball = null;
+    super.end(played);
   }
 
   draw(ctx, now) {
@@ -303,6 +341,79 @@ class Duo {
     }));
   }
 }
+
+// Sword fight in the middle of the rug: exchanges of strike and parry, the
+// last one to attack wins and the other one sits down, dizzy.
+class SwordDuel extends Duo {
+  constructor(players, slots) {
+    super(players, slots);
+    this.ready = 'sword-guard';
+    this.exchanges = between(EXCHANGES);
+    this.attacker = players[Math.floor(Math.random() * 2)];
+    this.next = 0;
+    this.spark = null;
+  }
+
+  spots(slots) {
+    const scale = Math.min(...this.players.map((c) => c.scale));
+    const middle = slots[Math.floor(slots.length / 2)].spot(scale);
+    return this.players.map((c, i) => ({ x: middle.x + (i === 0 ? -1 : 1) * DUEL_GAP * c.scale, y: middle.y }));
+  }
+
+  play(now) {
+    const [a, b] = [this.attacker, this.players.find((c) => c !== this.attacker)];
+    if (!this.clash) {
+      if (!this.next) this.next = now + 600;
+      if (now < this.next) return;
+      for (const c of this.players) c.dir = c.duoDir;
+      a.play('sword-strike');
+      b.play('sword-block');
+      a.t0 = b.t0 = now;
+      this.clash = { hit: false };
+      return;
+    }
+    const anim = ANIMS['sword-strike'];
+    if (!this.clash.hit && (now - a.t0) * anim.fps / 1000 >= 3) {
+      this.clash.hit = true;
+      const scale = Math.min(a.scale, b.scale);
+      // Where the blades meet: level with the hands, halfway between them.
+      this.spark = { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - 8 * scale, scale, t0: now };
+    }
+    if (!a.finished(now)) return;
+    this.clash = null;
+    if (--this.exchanges <= 0) {
+      this.winner = a;
+      return this.end(true);
+    }
+    for (const c of this.players) c.play('sword-guard', Infinity);
+    this.next = now + 300 + Math.random() * 700;
+    if (Math.random() < 0.6) this.attacker = b;
+  }
+
+  finale(c) {
+    if (c === this.winner) c.play('sword-win', 2, true);
+    else c.play('sword-lose', 4, true);
+  }
+
+  draw(ctx, now) {
+    if (!this.spark) return;
+    const { x, y, scale, t0 } = this.spark;
+    const t = (now - t0) / SPARK_MS;
+    if (t >= 1) return (this.spark = null);
+    // A star that bursts out then fades: centre, then rays one cell further each step.
+    const reach = 1 + Math.floor(t * 3);
+    ctx.fillStyle = t < 0.5 ? '#ffffff' : '#f2c14e';
+    const cell = (i, j) => ctx.fillRect(Math.round(x + (i - 0.5) * scale), Math.round(y + (j - 0.5) * scale), scale, scale);
+    if (t < 0.4) cell(0, 0);
+    ctx.fillStyle = '#f2c14e';
+    for (let k = 1; k <= reach; k++) {
+      cell(k, 0); cell(-k, 0); cell(0, k); cell(0, -k);
+      if (k < reach) { cell(k, k); cell(-k, -k); cell(k, -k); cell(-k, k); }
+    }
+  }
+}
+
+const GAMES = [BallGame, SwordDuel];
 
 // Idle Clawds free to start a game: not walking, not asleep, not already playing.
 function available(critter, now) {
@@ -433,7 +544,8 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       const rug = freeRug(zone, [a, b]);
       if (!rug) continue;
       // Whoever stands further left takes the left spot.
-      duos.push(new Duo(a.x <= b.x ? [a, b] : [b, a], rug));
+      const Game = pick(GAMES);
+      duos.push(new Game(a.x <= b.x ? [a, b] : [b, a], rug));
     }
   }
 
