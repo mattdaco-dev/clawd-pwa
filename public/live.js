@@ -30,7 +30,7 @@ function sleepAfter() {
 // `loose` replaces `anims` when every place at the station is taken.
 const WORK = {
   type: { station: 'desk', anims: ['type-front'], loose: ['type-front', 'type-laptop'] },
-  search: { station: 'shelf', anims: ['search'] },
+  search: { station: 'shelf', anims: ['search', 'read'] },
   web: { station: 'shelf', anims: ['globe'] },
   think: { station: 'board', anims: ['think'] },
 };

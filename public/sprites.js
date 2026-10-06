@@ -300,6 +300,25 @@ export const ANIMS = {
       magnifier(p, 18, [1, 0, 1, 2][i % 4]);
     }),
   },
+  // Reading at the bookshelf: an open book held low, a page turned now and then.
+  read: {
+    label: 'Lit un livre',
+    fps: 4,
+    loop: true,
+    frames: frames(12, (f, i) => {
+      const p = clawd(f, { eyes: i === 3 ? 'closed' : i === 10 ? 'happy' : 'down', left: 'low', right: 'low' });
+      stamp(p, 3, 5, [
+        'HWWWWWKWWWWWH',
+        'HWGGGWKWGGGWH',
+        'HWGGWWKWGGWWH',
+        'HHHHHHHHHHHHH',
+      ]);
+      // The page turns from right to left over frames 6 to 8.
+      if (i === 6) stamp(p, 10, 3, ['WWW.', '.WWW']);
+      if (i === 7) stamp(p, 9, 2, ['W', 'W', 'W']);
+      if (i === 8) stamp(p, 5, 3, ['.WWW', 'WWW.']);
+    }),
+  },
   globe: {
     label: 'Regarde le globe',
     fps: 4,
@@ -763,6 +782,7 @@ export const GROUPS = [
       ['type-laptop', 'Quand tous les bureaux sont pris'],
       ['type-side', 'Aux bureaux de côté (le bureau fait partie du décor)'],
       ['search', 'Read, Grep, Glob'],
+      ['read', 'Read, Grep, Glob, en alternance avec l\'enquête'],
       ['globe', 'WebFetch, WebSearch, outils MCP'],
       ['think', 'Prompt reçu (UserPromptSubmit), délégation à un subagent'],
     ],

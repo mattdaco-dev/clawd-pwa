@@ -45,7 +45,8 @@ export function createGallery(root) {
   function tick(now) {
     for (const { anim, ctx, width, height } of cards) {
       const n = anim.frames.length;
-      const i = Math.floor(((now - t0) * anim.fps) / 1000);
+      // The first frame's timestamp can precede t0.
+      const i = Math.max(0, Math.floor(((now - t0) * anim.fps) / 1000));
       const frame = anim.frames[anim.loop ? i % n : Math.min(i % (n + PAUSE_FRAMES), n - 1)];
       const ground = height - PAD / 2;
       ctx.clearRect(0, 0, width, height);
