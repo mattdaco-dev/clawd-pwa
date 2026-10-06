@@ -143,7 +143,7 @@ class Critter {
   }
 
   perform() {
-    const anims = !this.slot && this.plan.loose ? this.plan.loose : this.plan.anims;
+    const anims = this.slot?.anims ?? (!this.slot && this.plan.loose ? this.plan.loose : this.plan.anims);
     const name = pick(anims);
     if (this.slot) this.dir = this.slot.dir;
     this.play(name, name === 'sleep' ? Infinity : name === 'breathe' ? 1 : CYCLES[this.state]);

@@ -104,6 +104,9 @@ const SIDE = {
   arm: {
     lift: [[10, 5], [11, 5], [10, 6], [11, 6]],
     press: [[10, 7], [11, 7], [10, 8], [11, 8]],
+    // At a desk: the keyboard sits on row 5, level with the hand.
+    deskLift: [[10, 3], [11, 3], [10, 4], [11, 4]],
+    deskPress: [[10, 4], [11, 4], [10, 5], [11, 5]],
   },
   eye: {
     open: [[7, 2], [7, 3]],
@@ -206,6 +209,14 @@ export const ANIMS = {
       const press = i % 2 === 0;
       const p = sideClawd(f, { arm: press ? 'press' : 'lift', eye: i === 7 ? 'closed' : 'down' });
       laptop(p, press, i % 4 < 2);
+    }),
+  },
+  'type-side': {
+    label: 'Tape au bureau, de profil',
+    fps: 8,
+    loop: true,
+    frames: frames(8, (f, i) => {
+      sideClawd(f, { arm: i % 2 ? 'deskLift' : 'deskPress', eye: i === 7 ? 'closed' : 'open' });
     }),
   },
   search: {
@@ -443,8 +454,9 @@ export const GROUPS = [
     label: 'Travaille',
     hint: 'L\'agent est occupé. Le costume dépend de l\'outil en cours (PreToolUse).',
     items: [
-      ['type-front', 'Edit, Write, Bash et les autres outils'],
-      ['type-laptop', 'Variante du clavier, tirée au hasard'],
+      ['type-front', 'Edit, Write, Bash et les autres outils, aux bureaux de face'],
+      ['type-laptop', 'Quand tous les bureaux sont pris'],
+      ['type-side', 'Aux bureaux de côté (le bureau fait partie du décor)'],
       ['search', 'Read, Grep, Glob'],
       ['web', 'WebFetch, WebSearch, outils MCP'],
       ['think', 'Prompt reçu (UserPromptSubmit), délégation à un subagent'],
