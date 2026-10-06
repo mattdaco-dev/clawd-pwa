@@ -1,17 +1,19 @@
-import { DECORS, DEFAULT_DECOR } from './decor.js';
+import { DECORS, DEFAULT_SETTINGS, LAYOUTS, PIXEL_SIZES } from './decor.js';
 import { createGallery } from './gallery.js';
 import { createLive } from './live.js';
 
-// The decor choice is a per-viewer convenience; storage may be unavailable.
-const DECOR_KEY = 'clawd.decor';
-let decor = DEFAULT_DECOR;
+// Scene settings are a per-viewer convenience; storage may be unavailable.
+const SETTINGS_KEY = 'clawd.settings';
+let settings = { ...DEFAULT_SETTINGS };
 try {
-  decor = localStorage.getItem(DECOR_KEY) ?? DEFAULT_DECOR;
+  settings = { ...settings, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') };
 } catch {}
-if (!(decor in DECORS)) decor = DEFAULT_DECOR;
+if (!(settings.decor in DECORS)) settings.decor = DEFAULT_SETTINGS.decor;
+if (!(settings.layout in LAYOUTS)) settings.layout = DEFAULT_SETTINGS.layout;
+if (!PIXEL_SIZES.includes(settings.px)) settings.px = DEFAULT_SETTINGS.px;
 
-const live = createLive(document.getElementById('live'), { decor });
-const demo = createLive(document.getElementById('demo'), { demo: true, decor });
+const live = createLive(document.getElementById('live'), { settings });
+const demo = createLive(document.getElementById('demo'), { demo: true, settings });
 const views = {
   live,
   demo,
@@ -31,17 +33,26 @@ menu.addEventListener('click', (e) => {
   if (e.target.closest('a')) setMenu(false);
 });
 
-for (const input of menu.querySelectorAll('input[name="decor"]')) {
-  input.checked = input.value === decor;
+// The layout only means something with furniture: greyed out without a decor.
+function renderSettings() {
+  for (const input of menu.querySelectorAll('.setting input')) {
+    input.checked = String(settings[input.name]) === input.value;
+  }
+  menu.querySelector('[data-needs-decor]').disabled = settings.decor === 'none';
+}
+
+for (const input of menu.querySelectorAll('.setting input')) {
   input.addEventListener('change', () => {
-    decor = input.value;
-    live.setDecor(decor);
-    demo.setDecor(decor);
+    settings = { ...settings, [input.name]: input.name === 'px' ? Number(input.value) : input.value };
+    live.setSettings(settings);
+    demo.setSettings(settings);
+    renderSettings();
     try {
-      localStorage.setItem(DECOR_KEY, decor);
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch {}
   });
 }
+renderSettings();
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.menu')) setMenu(false);
 });

@@ -1,8 +1,9 @@
 import { ANIMS, FRAME_H } from './sprites.js';
 import { PALETTES, cycleDone, drawFrame, fitCanvas, frameIndex } from './render.js';
-import { DECORS, DEFAULT_DECOR } from './decor.js';
+import { DECORS, DEFAULT_SETTINGS } from './decor.js';
 
-const SCALE = { main: 5, sub: 4 };
+// Subagents are drawn one pixel size smaller than their main agent.
+const scaleFor = (kind, px) => (kind === 'main' ? px : Math.max(2, px - 1));
 const FEET = FRAME_H - 1; // rows from the top of a frame down to below the feet
 const CENTER = 15.5; // frame column under the middle of Clawd's body
 const HALF_BODY = 10; // body half-width in sprite pixels, arms included
@@ -38,9 +39,9 @@ function weighted(list) {
 
 // A Clawd in the office: x is the middle of its body, y the line under its feet.
 class Critter {
-  constructor(kind, x, y) {
+  constructor(kind, scale, x, y) {
     this.kind = kind;
-    this.scale = SCALE[kind];
+    this.scale = scale;
     this.x = x;
     this.y = y;
     this.dir = 1;
@@ -201,7 +202,7 @@ function randomSpot(zone, scale) {
 // A few steps away, for when every place at a station is taken.
 function nearbySpot(critter, zone) {
   const angle = Math.random() * Math.PI * 2;
-  const dist = 80 + Math.random() * 120;
+  const dist = (16 + Math.random() * 24) * critter.scale;
   return { x: critter.x + Math.cos(angle) * dist, y: clamp(critter.y + Math.sin(angle) * dist * 0.6, zone.y0, zone.y1) };
 }
 
@@ -230,13 +231,13 @@ function demoSnapshot(seconds) {
   ];
   const session = (id, name, offset) => {
     const { state, activity, subs } = steps[(Math.floor(seconds / 8) + offset) % steps.length];
-    return { id, name, state, activity, subagents: subs };
+    return { id, name, state, activity, subagents: subs.map((s) => ({ ...s, id: `${id}-${s.id}` })) };
   };
-  return { sessions: [session('demo', 'démo', 0), session('api', 'api', 3)] };
+  return { sessions: [session('demo', 'démo', 0), session('api', 'api', 3), session('web', 'web', 1)] };
 }
 
 // One scene: fed by the server snapshots, or by the scripted demo when `demo` is set.
-export function createLive(root, { demo = false, decor = DEFAULT_DECOR } = {}) {
+export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } = {}) {
   root.innerHTML = `
     <div class="stage"><canvas></canvas></div>
     <div class="live-bar"><span class="status" data-state="off">hors ligne</span></div>`;
@@ -249,6 +250,7 @@ export function createLive(root, { demo = false, decor = DEFAULT_DECOR } = {}) {
   let connected = false;
   let ctx;
   let width = 0;
+  let viewHeight = 0;
   let height = 0;
   let office = null;
   let officeKey = '';
@@ -258,14 +260,13 @@ export function createLive(root, { demo = false, decor = DEFAULT_DECOR } = {}) {
 
   function resize() {
     width = stage.clientWidth;
-    height = stage.clientHeight;
-    ctx = fitCanvas(canvas, width, height);
+    viewHeight = stage.clientHeight;
   }
 
   function renderStatus() {
     if (demo) {
       status.dataset.state = 'demo';
-      status.textContent = 'démo · 2 sessions, scénario en boucle de 48 s';
+      status.textContent = 'démo · 3 sessions, scénario en boucle de 48 s';
       return;
     }
     const n = snapshot.sessions.length;
@@ -273,14 +274,20 @@ export function createLive(root, { demo = false, decor = DEFAULT_DECOR } = {}) {
     status.textContent = connected ? `connecté · ${n} session${n > 1 ? 's' : ''}` : 'hors ligne';
   }
 
-  // Rebuilds the decor when the window, the decor or the list of sessions changes.
+  // Rebuilds the decor when the window, the settings or the list of sessions change.
   function ensureOffice(sessions) {
     const names = sessions.map((s) => s.name || s.id.slice(0, 8));
-    const key = `${decor}|${width}x${height}|${names.join('|')}`;
+    const { decor, layout, px } = settings;
+    const key = `${decor}|${layout}|${px}|${width}x${viewHeight}|${names.join('|')}`;
     if (key === officeKey) return;
     officeKey = key;
-    office = (DECORS[decor] ?? DECORS[DEFAULT_DECOR]).build(width, height, names);
-    for (const critter of critters.values()) critter.relocate();
+    office = (DECORS[decor] ?? DECORS[DEFAULT_SETTINGS.decor]).build(width, viewHeight, names, { layout, px });
+    height = office.height;
+    ctx = fitCanvas(canvas, width, height);
+    for (const critter of critters.values()) {
+      critter.scale = scaleFor(critter.kind, px);
+      critter.relocate();
+    }
   }
 
   function tick(now) {
@@ -291,13 +298,15 @@ export function createLive(root, { demo = false, decor = DEFAULT_DECOR } = {}) {
     const agents = agentsOf(current);
 
     for (const agent of agents) {
-      const zone = office.zones[agent.zone];
+      // Rooms keep each session in its own zone; the shared office has a single one.
+      const zone = office.zones[office.shared ? 0 : agent.zone];
       let critter = critters.get(agent.key);
       if (!critter) {
+        const scale = scaleFor(agent.kind, settings.px);
         const parent = agent.parent && critters.get(agent.parent);
         critter = parent
-          ? new Critter(agent.kind, parent.x + (Math.random() < 0.5 ? -1 : 1) * (60 + Math.random() * 60), parent.y + (Math.random() - 0.5) * 120)
-          : new Critter(agent.kind, (zone.x0 + zone.x1) / 2, (zone.y0 + zone.y1) / 2);
+          ? new Critter(agent.kind, scale, parent.x + (Math.random() < 0.5 ? -1 : 1) * (12 + Math.random() * 12) * scale, parent.y + (Math.random() - 0.5) * 24 * scale)
+          : new Critter(agent.kind, scale, zone.x0 + Math.random() * (zone.x1 - zone.x0), (zone.y0 + zone.y1) / 2);
         critters.set(agent.key, critter);
       }
       critter.label = agent.label;
@@ -330,13 +339,13 @@ export function createLive(root, { demo = false, decor = DEFAULT_DECOR } = {}) {
       const main = critter.kind === 'main';
       ctx.font = main ? '600 13px ui-monospace, monospace' : '11px ui-monospace, monospace';
       ctx.fillStyle = main ? '#3d3929' : '#8f8b82';
-      ctx.fillText(critter.label ?? '', Math.round(critter.x), Math.round(critter.y) + (main ? 20 : 16));
+      ctx.fillText(critter.label ?? '', Math.round(critter.x), Math.round(critter.y) + 12 + critter.scale);
     }
 
     if (critters.size === 0) {
       ctx.fillStyle = '#8f8b82';
       ctx.font = '14px system-ui, sans-serif';
-      ctx.fillText('Aucune session Claude Code active', width / 2, height / 2);
+      ctx.fillText('Aucune session Claude Code active', width / 2, viewHeight / 2);
     }
 
     raf = requestAnimationFrame(tick);
@@ -367,8 +376,8 @@ export function createLive(root, { demo = false, decor = DEFAULT_DECOR } = {}) {
       connected = value;
       renderStatus();
     },
-    setDecor(name) {
-      decor = name;
+    setSettings(next) {
+      settings = next;
     },
   };
 }

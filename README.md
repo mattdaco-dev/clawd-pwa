@@ -25,7 +25,13 @@ Le service écrit le chemin absolu de `node` dans le plist (launchd ne voit pas 
 Ouvrir http://localhost:4777 dans Chrome, puis « Installer l'application » pour en faire une PWA.
 Le bouton rond en haut à gauche ouvre le menu : Live (les vraies sessions), Démo (un scénario en
 boucle sans Claude Code) et Galerie (toutes les animations regroupées par activité). Le même menu
-choisit le décor (aucun ou open space, la plage viendra ensuite) ; le choix reste dans le navigateur.
+porte les réglages, gardés dans le navigateur :
+
+- Décor : aucun ou open space (la plage viendra ensuite).
+- Disposition, avec un décor : « Salles » (une pièce de taille fixe par session, en grille ; la page
+  défile quand il y en a trop) ou « Open space partagé » (un seul bureau, tout le monde partage les
+  postes).
+- Taille des pixels : de 3 à 6 px, décor compris. Les subagents ont toujours un pixel de moins.
 
 Le hook garde une copie brute de chaque payload dans `logs/events.jsonl` (5 Mo max, `CLAWD_LOG=0`
 pour couper). Il ne bloque jamais Claude : sortie vide, code 0, envoi au serveur détaché.
@@ -38,6 +44,7 @@ pour couper). Il ne bloque jamais Claude : sortie vide, code 0, envoi au serveur
 - `public/live.js` : la scène plein écran (vues Live et Démo), `public/gallery.js` : la galerie.
 - `public/decor.js` : le registre des décors ; un décor fournit le fond, une zone par session avec ses
   postes, les meubles triés en profondeur avec les Clawd et un calque redessiné à chaque image.
-- `public/office.js` : le décor open space (une colonne meublée par session) et ses postes : bureau
+- `public/office.js` : le décor open space (salles ou bureau partagé, aménagement tiré au hasard par
+  session) et ses postes : bureau
   pour taper, bibliothèque pour chercher, radio pour le web, tableau blanc pour réfléchir, avant-scène
   pour attendre un input, café, tapis de jeu et poufs pour la sieste.
