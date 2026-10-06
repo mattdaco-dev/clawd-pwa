@@ -1114,8 +1114,26 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
     slot(type, cx, top + chair.seat * p);
   };
 
-  const leftW = Math.round(clamp(W * 0.22, u(300), u(460)));
-  const rightW = Math.round(clamp(W * 0.27, u(360), u(540)));
+  // A loose hedge along x between from and to: small clumps of one to three
+  // items, irregularly spaced, sometimes missing, never in a straight line.
+  const hedge = (x, from, to, items) => {
+    for (let y = from + u(between(0, 60)); y <= to; y += u(between(130, 260))) {
+      if (random() < 0.2) continue;
+      // Each item half a height lower than the last, stepping left and right.
+      const n = int(1, 3);
+      let base = y;
+      let side = random() < 0.5 ? -1 : 1;
+      for (let k = 0; k < n && base <= to; k++) {
+        const s = pickOne(items)();
+        standing(s, x - (s.w * p) / 2 + (n > 1 ? side * u(between(20, 34)) : u(between(-18, 18))), base);
+        base += (s.h * p) / 2 + u(between(8, 16));
+        side = -side;
+      }
+    }
+  };
+
+  const leftW = Math.round(clamp(W * 0.2, u(300), u(440)));
+  const rightW = Math.round(clamp(W * 0.31, u(400), u(620)));
   const lx1 = x0 + leftW;
   const rx0 = x1 - rightW;
   const floorTop = wall + u(30);
@@ -1171,9 +1189,7 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
   }
 
   // Divider between the library and the desks: low bookcases, spaced like a hedge.
-  for (let y = floorTop + u(110); y <= floorEnd; y += u(170)) {
-    standing(look.lowShelf(true), lx1 - (LOW_SHELF.w * p) / 2, y);
-  }
+  hedge(lx1, floorTop + u(90), floorEnd, [() => look.lowShelf(true), () => look.lowShelf(false), look.plant]);
 
   // ---- Right: kitchen along the wall, lounge in the middle of the zone.
   let kitchen = x1 - u(20) - FRIDGE.w * p;
@@ -1189,7 +1205,7 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
   standing(kitchenPlant, kitchen, backBase);
   drawSprite(g, PAINTING, kitchen - u(30) - PAINTING.w * p, wall - u(90), p);
 
-  const loungeX = (rx0 + x1) / 2;
+  const loungeX = rx0 + rightW * between(0.45, 0.55);
   const rugW = Math.min(rightW - u(100), u(300));
   const rugH = u(90);
   const rugY = floorTop + (floorEnd - floorTop) * 0.55;
@@ -1223,9 +1239,10 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
   // Café corner under the lounge: a table between two armchairs, a plant.
   const cafeBase = rugY + rugH / 2 + u(230);
   if (cafeBase <= floorEnd) {
-    centered(TABLE, loungeX, cafeBase);
+    const cafeX = clamp(loungeX + u(between(-50, 50)), rx0 + u(140), x1 - u(160));
+    centered(TABLE, cafeX, cafeBase);
     for (const side of [-1, 1]) {
-      const cx = loungeX + side * u(100);
+      const cx = cafeX + side * u(100);
       seat(cafeChair, cx, cafeBase - cafeChair.h * p + u(4), 'coffee');
     }
     const cafePlant = look.tallPlant();
@@ -1233,88 +1250,151 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
   }
 
   // Green divider between the desks and the lounge.
-  for (let y = floorTop + u(120); y <= floorEnd; y += u(150)) {
-    const plant = look.tallPlant();
-    standing(plant, rx0 - (plant.w * p) / 2, y);
-  }
+  hedge(rx0, floorTop + u(100), floorEnd, [look.tallPlant, look.tallPlant, look.plant]);
 
-  // ---- Middle: islands of 4 or 6 desks, in a grid with aisles.
+  // ---- Middle: clusters of desks of mixed sizes, loosely aligned, with a
+  // meeting spot here and there where an island would have been.
   const cx0 = lx1 + u(60);
   const cx1 = rx0 - u(60);
   const cw = cx1 - cx0;
   const pitch = u(60); // between the pairs of desks of an island
-  const islandW = u(290);
-  const aisle = u(80);
-  const cols = Math.max(1, Math.floor((cw + aisle) / (islandW + aisle)));
-  const split = cols >= 3; // low bookcases between the two halves of the plateau
-  const extra = split ? u(70) : 0;
-  const gridW = cols * islandW + (cols - 1) * aisle + extra;
-  const gx0 = cx0 + (cw - gridW) / 2;
-  const colX = (c) => gx0 + c * (islandW + aisle) + (split && c >= Math.ceil(cols / 2) ? extra : 0);
-
-  const footPlant = look.plant();
-  const ch = floorEnd - floorTop - u(40);
+  const cols = Math.max(1, Math.floor((cw + u(40)) / u(410)));
   const height = (pairs) => (pairs - 1) * pitch + SIDE_DESK.h * p;
-  const rowsPlan = [];
+  const bandH = (pairs) => height(pairs) + u(130);
+  const ch = floorEnd - floorTop - u(40);
+  // Bands of islands up to 6 seats, plus a lower one up to 4 where room is left,
+  // slipped in at a random place.
+  const bands = [];
   let used = 0;
-  for (const pairs of [3, 2, 3]) { // islands of 6, then 4, then 6 seats
-    const need = height(pairs) + u(130);
-    if (used + need > ch) continue;
-    rowsPlan.push(pairs);
-    used += need;
+  while (used + bandH(3) <= ch) {
+    bands.push(3);
+    used += bandH(3);
   }
-  if (!rowsPlan.length) rowsPlan.push(2);
-  const rowGap = (ch - used) / (rowsPlan.length + 1);
-  let y = floorTop + u(60) + rowGap;
-  let lastRowY = y;
-  for (const pairs of rowsPlan.slice(0, -1)) lastRowY += height(pairs) + u(130) + rowGap;
-  for (const pairs of rowsPlan) {
-    for (let c = 0; c < cols; c++) {
-      const leftDesk = colX(c) + u(75);
-      const rightDesk = leftDesk + SIDE_DESK.w * p;
-      for (let k = 0; k < pairs; k++) {
-        const deskTop = y + k * pitch;
-        const keys = deskTop + SIDE_KEYS * p;
-        props.push({ base: keys + 2 * p, draw: (ctx) => drawSprite(ctx, SIDE_DESK, leftDesk, deskTop, p) });
-        props.push({ base: keys + 2 * p, draw: (ctx) => drawSprite(ctx, SIDE_DESK_LEFT, rightDesk, deskTop, p) });
-        slot('desk', leftDesk, keys, 5, { dxPerScale: -4.5, anims: ['type-side'], light: sideDeskLight(leftDesk, deskTop, p, 1) });
-        slot('desk', rightDesk + SIDE_DESK.w * p, keys, 5, { dxPerScale: 3.5, dir: -1, anims: ['type-side'], light: sideDeskLight(rightDesk, deskTop, p, -1) });
-      }
-      // At the foot of each island: low bookcases separating it from the next
-      // row, or a plant or a bin after the last one.
-      const foot = y + height(pairs) + u(55);
-      if (pairs !== rowsPlan.at(-1) || y !== lastRowY) {
-        standing(look.lowShelf(true), rightDesk - LOW_SHELF.w * p, foot);
-        standing(look.lowShelf(false), rightDesk, foot);
-      } else {
-        const end = pickOne([footPlant, footPlant, BIN, null]);
-        if (end) centered(end, rightDesk, foot);
+  if (used + bandH(2) <= ch || !bands.length) {
+    bands.splice(int(0, bands.length), 0, 2);
+    used += bandH(2);
+  }
+  const bandGap = Math.max(0, ch - used) / (bands.length + 1);
+
+  const island = (cx, y, pairs) => {
+    const leftDesk = cx - SIDE_DESK.w * p;
+    for (let k = 0; k < pairs; k++) {
+      const deskTop = y + k * pitch;
+      const keys = deskTop + SIDE_KEYS * p;
+      props.push({ base: keys + 2 * p, draw: (ctx) => drawSprite(ctx, SIDE_DESK, leftDesk, deskTop, p) });
+      props.push({ base: keys + 2 * p, draw: (ctx) => drawSprite(ctx, SIDE_DESK_LEFT, cx, deskTop, p) });
+      slot('desk', leftDesk, keys, 5, { dxPerScale: -4.5, anims: ['type-side'], light: sideDeskLight(leftDesk, deskTop, p, 1) });
+      slot('desk', cx + SIDE_DESK.w * p, keys, 5, { dxPerScale: 3.5, dir: -1, anims: ['type-side'], light: sideDeskLight(cx, deskTop, p, -1) });
+    }
+    return y + height(pairs);
+  };
+  // One or two rows of two desks facing the front.
+  const frontRows = (cx, y, rows) => {
+    for (let r = 0; r < rows; r++) {
+      const deskTop = y + r * u(100);
+      for (const left of [cx - DESK.w * p - u(12), cx + u(12)]) {
+        prop(DESK, left, deskTop);
+        slot('desk', left + 18 * p, deskTop + (DESK_SURFACE + 1) * p, 2, { light: frontDeskLight(left, deskTop, p) });
       }
     }
-    y += height(pairs) + u(130) + rowGap;
-  }
-  if (split) {
-    // Wider central aisle, lined with plants.
-    const sx = colX(Math.ceil(cols / 2)) - aisle / 2 - extra / 2;
-    const aislePlant = look.plant();
-    for (let py = floorTop + u(140); py <= floorEnd; py += u(220)) centered(aislePlant, sx, py);
+    return y + (rows - 1) * u(100) + DESK.h * p;
+  };
+  const meeting = (cx, y) => {
+    const tableBase = y + u(80);
+    paintRug(g, cx, tableBase - u(18), u(200), u(85), look.rug(), p);
+    centered(TABLE, cx, tableBase);
+    slot('board', cx, tableBase - TABLE.h * p + u(12));
+    slot('board', cx - u(95), tableBase - u(6));
+    slot('board', cx + u(95), tableBase - u(6));
+    if (random() < 0.6) {
+      const boardBase = tableBase + u(110);
+      centered(look.boardStand(), cx + u(between(-30, 30)), boardBase);
+      slot('board', cx - u(40), boardBase + u(30));
+      slot('board', cx + u(40), boardBase + u(30));
+    } else {
+      centered(look.tallPlant(), cx + u(between(-60, 60)), tableBase + u(90));
+    }
+  };
+  // What closes an island: low bookcases, a plant, a bin, or nothing.
+  const foot = (cx, base) => {
+    const kind = pickOne(['shelves', 'shelf', 'plant', 'plant', 'bin', 'none']);
+    if (kind === 'shelves') {
+      standing(look.lowShelf(true), cx - LOW_SHELF.w * p, base);
+      standing(look.lowShelf(false), cx, base);
+    } else if (kind === 'shelf') centered(look.lowShelf(random() < 0.5), cx + u(between(-30, 30)), base);
+    else if (kind === 'plant') centered(look.plant(), cx + u(between(-40, 40)), base);
+    else if (kind === 'bin') centered(BIN, cx + u(between(-40, 40)), base);
+  };
+
+  let meetings = 0;
+  let bandTop = floorTop + u(60) - bandH(3);
+  let lastH = bandH(3);
+  for (const maxPairs of bands) {
+    bandTop += lastH + bandGap;
+    lastH = bandH(maxPairs);
+    // Some bands lose a column, so the clusters do not line up row after row.
+    const count = cols >= 3 && random() < 0.35 ? cols - 1 : cols;
+    const meetAt = count >= 3 && meetings < 2 && random() < 0.45 ? int(0, count - 1) : -1;
+    const centers = [];
+    for (let i = 0; i < count; i++) {
+      const cx = cx0 + (cw * (i + 0.5)) / count + u(between(-20, 20));
+      centers.push(cx);
+      if (i === meetAt) {
+        meetings++;
+        meeting(cx, bandTop + u(between(0, 30)));
+        continue;
+      }
+      const kind = pickOne(['island', 'island', 'island', 'island', 'front']);
+      let end;
+      if (kind === 'front') {
+        end = frontRows(cx, bandTop + u(between(0, 40)), maxPairs === 3 ? int(1, 2) : 1);
+      } else {
+        const pairs = Math.min(maxPairs, pickOne([3, 3, 2, 2, 2, 1]));
+        const y = bandTop + between(0, Math.max(0, lastH - u(130) - height(pairs)));
+        end = island(cx, y, pairs);
+      }
+      if (end + u(55) <= bandTop + lastH + bandGap / 2) foot(cx, end + u(55));
+    }
+    // Now and then a clump of plants in the aisle between two clusters.
+    for (let i = 0; i + 1 < centers.length; i++) {
+      if (random() >= 0.35) continue;
+      const ax = (centers[i] + centers[i + 1]) / 2;
+      const ay = bandTop + between(u(40), Math.max(u(40), lastH - u(40)));
+      centered(look.plant(), ax + u(between(-10, 10)), ay);
+      if (random() < 0.5) centered(look.tallPlant(), ax + u(between(-15, 15)), ay + u(30));
+    }
   }
 
-  // ---- Wall over the plateau: windows in a regular rhythm, the clock in the middle.
+  // ---- Wall over the plateau: windows in groups of one to three, with
+  // wall pieces in between (a painting, a pin board, the clock) or bare wall.
   const wallFrom = shelfStart + shelves * (SHELF.w * p + u(4)) + u(30);
   const wallTo = kitchen - u(60) - PAINTING.w * p;
-  const span = wallTo - wallFrom;
-  const windows = Math.max(0, Math.floor(span / u(170)));
-  const middle = windows % 2 ? Math.floor(windows / 2) : -1; // odd count: the clock takes the middle spot
-  for (let i = 0; i < windows; i++) {
-    const cx = wallFrom + (span * (i + 0.5)) / windows;
-    if (i === middle) clocks.push({ x: cx, y: top + Math.round(wallH * 0.45) });
-    else {
-      drawSprite(g, WINDOW, cx - u(50), wall - u(84), p);
-      skies.push({ left: Math.round(cx - u(50)), top: Math.round(wall - u(84)) });
+  const winW = WINDOW.w * p;
+  const gaps = []; // middle and width of each stretch of wall between groups
+  let wx = wallFrom + u(between(0, 40));
+  while (wx + winW <= wallTo) {
+    const n = Math.min(int(1, 3), Math.floor((wallTo - wx + u(8)) / (winW + u(8))));
+    for (let k = 0; k < n; k++) {
+      const left = wx + k * (winW + u(8));
+      drawSprite(g, WINDOW, left, wall - u(84), p);
+      skies.push({ left: Math.round(left), top: Math.round(wall - u(84)) });
     }
+    wx += n * (winW + u(8));
+    const gap = u(between(50, 180));
+    gaps.push({ x: wx + gap / 2, w: gap });
+    wx += gap;
   }
-  if (middle < 0) clocks.push({ x: wallFrom + span / 2, y: top + Math.round(wallH * 0.45) });
+  // The clock goes in the stretch closest to the middle, wide enough or not.
+  const mid = (wallFrom + wallTo) / 2;
+  const clockGap = gaps.reduce((best, gp) => (!best || Math.abs(gp.x - mid) < Math.abs(best.x - mid) ? gp : best), null);
+  clocks.push({ x: clockGap ? clockGap.x : mid, y: top + Math.round(wallH * 0.45) });
+  for (const gp of gaps) {
+    if (gp === clockGap || gp.x + gp.w / 2 > wallTo) continue;
+    const piece = pickOne([PAINTING, look.board(), null, null, null]);
+    if (!piece || piece.w * p + u(16) > gp.w) continue;
+    const pieceTop = piece === PAINTING ? wall - u(90) : wall - u(18) - piece.h * p;
+    drawSprite(g, piece, gp.x - (piece.w * p) / 2, pieceTop, p);
+  }
 
   // ---- Front walkway, framed by two tall plants.
   const entrance = look.tallPlant(); // the same model on both sides
