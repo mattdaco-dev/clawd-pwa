@@ -928,7 +928,7 @@ function drawClock(ctx, { x, y }, date, u) {
   ctx.strokeStyle = '#3d3929';
   ctx.lineWidth = Math.max(2, u(3));
   ctx.beginPath();
-  ctx.arc(x, y, u(16), 0, Math.PI * 2);
+  ctx.arc(x, y, u(20), 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   const hand = (turns, length, width) => {
@@ -939,7 +939,12 @@ function drawClock(ctx, { x, y }, date, u) {
     ctx.lineTo(x + Math.cos(a) * length, y + Math.sin(a) * length);
     ctx.stroke();
   };
-  const minutes = date.getMinutes() + date.getSeconds() / 60;
-  hand(((date.getHours() % 12) + minutes / 60) / 12, u(8), Math.max(2, u(3)));
-  hand(minutes / 60, u(12), Math.max(1, u(2)));
+  const seconds = date.getSeconds();
+  const minutes = date.getMinutes() + seconds / 60;
+  hand(((date.getHours() % 12) + minutes / 60) / 12, u(10), Math.max(2, u(3)));
+  hand(minutes / 60, u(15), Math.max(1, u(2)));
+  ctx.strokeStyle = INK.R; // second hand, ticking once a second
+  hand(seconds / 60, u(17), 1);
+  ctx.fillStyle = INK.R;
+  ctx.fillRect(x - 1, y - 1, 2, 2);
 }
