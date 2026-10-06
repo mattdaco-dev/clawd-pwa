@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clawd</title>
+  <meta name="theme-color" content="#d77757">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Clawd</h1>
+    <nav>
+      <a href="#/" data-view="live">Live</a>
+      <a href="#/galerie" data-view="galerie">Galerie</a>
+    </nav>
+  </header>
+  <main>
+    <section id="live" hidden></section>
+    <section id="gallery" hidden>
+      <p class="intro">Toutes les animations, regroupées par activité de l'agent. À gauche le Clawd du main, à droite celui d'un subagent.</p>
+    </section>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

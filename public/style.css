@@ -1,0 +1,164 @@
+:root {
+  --bg: #faf9f5;
+  --text: #3d3929;
+  --muted: #8f8b82;
+  --line: #e4e0d5;
+  --stage: #f0eee6;
+  --accent: #d77757;
+  --ok: #3f9b5b;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1f1e1d;
+    --text: #ece9e1;
+    --muted: #a19d93;
+    --line: #3a3835;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1f1e1d;
+  --text: #ece9e1;
+  --muted: #a19d93;
+  --line: #3a3835;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+nav {
+  display: flex;
+  gap: 4px;
+}
+
+nav a {
+  padding: 4px 12px;
+  border-radius: 6px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+nav a[aria-current] {
+  background: var(--line);
+  color: var(--text);
+}
+
+main {
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.stage {
+  background: var(--stage);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.stage canvas {
+  display: block;
+}
+
+.live-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.status[data-state="on"]::before {
+  background: var(--ok);
+}
+
+.status[data-state="demo"]::before {
+  background: var(--accent);
+}
+
+.intro,
+.hint {
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+
+.group {
+  margin-bottom: 32px;
+}
+
+.group h2 {
+  margin: 0 0 2px;
+  font-size: 17px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.card canvas {
+  display: block;
+  max-width: 100%;
+  background: var(--stage);
+  border-radius: 8px;
+}
+
+.card h3 {
+  margin: 10px 0 2px;
+  font-size: 15px;
+}
+
+.card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.card .meta {
+  margin-top: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
