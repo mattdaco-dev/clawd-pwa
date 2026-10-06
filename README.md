@@ -57,8 +57,10 @@ clair. Le hook est déclaré `async`, il ne bloque jamais Claude : sortie vide, 
 - `public/office.js` : le décor open space (salles ou bureau partagé, aménagement tiré au hasard par
   session) et ses postes : bureau
   pour taper, bibliothèque et globe pour chercher et le web, tableau blanc pour réfléchir, avant-scène
-  pour attendre un input, café, radio, tapis de jeu et poufs pour la sieste. Deux Clawd au repos dans
-  la même zone se retrouvent parfois sur un tapis pour une passe de ballon ou un duel à l'épée, ou
-  devant une radio pour danser (`BallGame`, `SwordDuel`, `DanceDuo` dans `live.js`). Un troisième
-  vient parfois regarder et applaudit à la fin. Un Clawd qui finit son travail tape dans la main d'un
+  pour attendre un input, coin café (comptoir avec machine, on y boit un café), radio, tapis de jeu
+  et poufs pour la sieste. Deux Clawd au repos dans la même zone se retrouvent parfois sur un tapis
+  pour une passe de ballon ou un duel à l'épée, devant une radio pour danser, ou au comptoir pour
+  discuter tasse en main, chacun son tour avec une bulle (`BallGame`, `SwordDuel`, `DanceDuo`,
+  `CoffeeChat` dans `live.js`). Un troisième vient parfois regarder les jeux et applaudit à la fin,
+  jamais les discussions. Un Clawd qui finit son travail tape dans la main d'un
   voisin au repos (`HighFive`), et un subagent terminé apporte son rapport à son agent principal.

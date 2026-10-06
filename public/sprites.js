@@ -193,6 +193,16 @@ function headphones(p) {
 
 const NOTE = ['.KK', '.K.', 'KK.', 'KK.'];
 
+// Blue mug, top-left at (x, y), 3x3 with the handle on the outer side; steam
+// curls up from it on even frames t when hot.
+function mug(p, x, y, t = null) {
+  stamp(p, x, y, ['BBB.', 'BBBB', 'BBB.']);
+  if (t === null) return;
+  p(x + (t % 2), y - 2, 'L');
+  p(x + 1 + ((t + 1) % 2), y - 3, 'L');
+  if (t % 4 < 2) p(x + 2, y - 4, 'L');
+}
+
 function hat(p) {
   for (let x = 1; x <= 17; x++) p(x, -1, 'K');
   for (let y = -4; y <= -2; y++) for (let x = 5; x <= 13; x++) p(x, y, y === -2 ? 'H' : 'K');
@@ -584,6 +594,57 @@ export const ANIMS = {
       if (i === 3) for (const [x, y] of [[19, -5], [21, -4], [20, -6], [18, -6], [21, -2]]) p(x, y, 'Y');
     }),
   },
+  // A coffee at the counter: steaming mug, a sip, a satisfied look.
+  coffee: {
+    label: 'Boit un café',
+    fps: 4,
+    loop: true,
+    frames: frames(12, (f, i) => {
+      const sip = i >= 5 && i <= 7;
+      const raised = i === 4 || i === 8;
+      const p = clawd(f, {
+        eyes: sip ? 'closed' : i >= 9 ? 'happy' : i === 2 ? 'closed' : 'open',
+        right: sip ? 'mid' : raised ? 'lift' : 'out',
+      });
+      // Held at the hand, then brought up against the face to drink.
+      if (sip) mug(p, 14, 1);
+      else if (raised) mug(p, 18, 1);
+      else mug(p, 18, 3, i);
+    }),
+  },
+  // Chatting over a coffee with the Clawd on the right, mug in hand.
+  'coffee-talk': {
+    label: 'Raconte, tasse en main',
+    fps: 4,
+    loop: true,
+    frames: frames(8, (f, i) => {
+      const bob = i === 2 || i === 6;
+      const p = clawd(f, {
+        dy: bob ? -1 : 0,
+        eyes: i === 3 || i === 7 ? 'happy' : 'right',
+        left: ['out', 'mid', 'high', 'mid', 'out', 'lift', 'mid', 'lift'][i],
+        legs: bob ? 'tuck' : 'stand',
+      });
+      mug(p, 18, 3, i);
+    }),
+  },
+  'coffee-listen': {
+    label: 'Écoute, tasse en main',
+    fps: 3,
+    loop: true,
+    frames: frames(8, (f, i) => {
+      const nod = i === 2 || i === 5;
+      const sip = i === 7;
+      const p = clawd(f, {
+        dy: nod ? 1 : 0,
+        eyes: sip || i === 4 ? 'closed' : 'right',
+        right: sip ? 'mid' : 'out',
+        legs: nod ? 'tuck' : 'stand',
+      });
+      if (sip) mug(p, 14, 1);
+      else mug(p, 18, 3 + (nod ? 1 : 0), i);
+    }),
+  },
   // Watching a game from the side, facing it.
   cheer: {
     label: 'Encourage',
@@ -736,6 +797,9 @@ export const GROUPS = [
       ['sword-win', 'Fin du duel, le dernier à attaquer gagne'],
       ['sword-lose', 'Fin du duel, l\'autre est sonné'],
       ['duo-dance', 'Danse à deux devant une radio'],
+      ['coffee', 'Pause café au comptoir'],
+      ['coffee-talk', 'Discute au comptoir, une bulle au-dessus de la tête'],
+      ['coffee-listen', 'Écoute l\'autre au comptoir'],
       ['cheer', 'Un troisième Clawd regarde une partie, puis applaudit à la fin (Fête ça)'],
       ['sleep', '2 minutes sans activité'],
     ],

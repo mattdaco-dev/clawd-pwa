@@ -38,7 +38,7 @@ const WAIT = { station: 'front', anims: ['flag', 'bubble', 'wave'] };
 const SLEEP = { station: 'beanbag', anims: ['sleep'] };
 const IDLE = [
   [{ station: null, wander: true, anims: ['breathe', 'look'] }, 40],
-  [{ station: 'coffee', anims: ['breathe', 'look'] }, 25],
+  [{ station: 'coffee', anims: ['coffee'] }, 25],
   [{ station: 'rug', anims: ['ball', 'dance', 'jump'] }, 30],
   [{ station: 'radio', anims: ['music'] }, 20],
 ];
@@ -56,6 +56,24 @@ const DANCE_GAP = 12; // sprite pixels from the middle to each dancer
 const DANCE_MS = [6000, 10000];
 const FIVE_GAP = 10; // sprite pixels from the meeting point to each hand
 const FIVE_REACH = 70; // sprite pixels: further away, they celebrate alone
+const CHAT_GAP = 12; // sprite pixels from the middle of the counter to each Clawd
+const CHAT_TURNS = [5, 9]; // lines before they go back to their business
+const CHAT_MS = [1800, 3000]; // how long one of them speaks
+const HEAD = 10; // sprite pixels from the feet to the top of the head
+
+// What a Clawd says over a coffee, one 7x5 picture per bubble.
+const SAYINGS = [
+  ['.......', '.......', '.K.K.K.', '.......', '.......'],
+  ['.RR.RR.', 'RRRRRRR', '.RRRRR.', '..RRR..', '...R...'],
+  ['...K...', '...K...', '...K...', '.......', '...K...'],
+  ['..KKK..', '.....K.', '...KK..', '.......', '...K...'],
+  ['.Y.Y.Y.', '..YYY..', 'YYYYYYY', '..YYY..', '.Y.Y.Y.'],
+  ['.K...K.', '..RKR..', '.RRKRR.', '.RKRKR.', '..RRR..'],
+  ['..YYY..', '.YYYYY.', '.YYYYY.', '..YYY..', '..GGG..'],
+  ['......P', '.....P.', 'P...P..', '.P.P...', '..P....'],
+  ['.L..L..', '..L..L.', 'BBBBB..', 'BBBBB.B', '.BBB...'],
+];
+const BUBBLE = ['.KKKKKKKKK.', ...Array(7).fill('KWWWWWWWWWK'), '.KKKKKKKKK.'];
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -283,11 +301,12 @@ class Duo {
     this.players = players;
     this.watchers = [];
     this.slots = slots;
+    this.watchable = true;
+    for (const c of players) c.release();
     for (const slot of slots) slot.occupant = this;
     const spots = this.spots(slots);
     this.places = spots;
     players.forEach((c, i) => {
-      c.release();
       c.locked = false;
       c.plan = null;
       c.duo = this;
@@ -366,6 +385,9 @@ class Duo {
   }
 
   draw() {}
+
+  // Drawn over the whole scene, night included, like the names.
+  drawOver() {}
 }
 
 const between = ([lo, hi]) => lo + Math.floor(Math.random() * (hi - lo + 1));
@@ -588,7 +610,78 @@ class DanceDuo extends Duo {
   }
 }
 
-const GAMES = [BallGame, SwordDuel, DanceDuo];
+// Chatting over a coffee in front of the counter: they take turns, the one
+// speaking shows what it says in a bubble, the other nods and sips.
+class CoffeeChat extends Duo {
+  static place(zone, players) {
+    return freeCounter(zone, players);
+  }
+
+  constructor(players, slots) {
+    super(players, slots);
+    this.ready = 'coffee';
+    this.watchable = false; // nobody stands around a private conversation
+    this.turns = between(CHAT_TURNS);
+    this.speaker = null;
+    this.until = 0;
+    this.bubble = null;
+  }
+
+  spots([counter]) {
+    const scale = Math.min(...this.players.map((c) => c.scale));
+    const { x, y } = counter.spot(scale);
+    return this.players.map((c, i) => ({ x: x + (i === 0 ? -1 : 1) * CHAT_GAP * c.scale, y }));
+  }
+
+  play(now) {
+    if (now < this.until) return;
+    if (this.speaker && --this.turns <= 0) return this.end(true);
+    // Mostly a reply, sometimes a follow-up from the same one.
+    const other = this.players.find((c) => c !== this.speaker);
+    this.speaker = !this.speaker ? pick(this.players) : Math.random() < 0.75 ? other : this.speaker;
+    for (const c of this.players) {
+      c.dir = c.duoDir;
+      c.play(c === this.speaker ? 'coffee-talk' : 'coffee-listen', Infinity);
+      c.t0 = now;
+    }
+    const ms = CHAT_MS[0] + Math.random() * (CHAT_MS[1] - CHAT_MS[0]);
+    this.until = now + ms;
+    const last = this.bubble?.saying;
+    this.bubble = { who: this.speaker, saying: pick(SAYINGS.filter((s) => s !== last)), from: now + 200, to: now + ms - 350 };
+  }
+
+  finale(c) {
+    c.play('coffee', 1, true);
+  }
+
+  // A speech bubble over the speaker's head, its tail pointing down at it.
+  drawOver(ctx, now) {
+    const b = this.bubble;
+    if (!b || now < b.from || now > b.to) return;
+    const c = b.who;
+    const s = c.scale;
+    const ink = PALETTES.main;
+    const left = Math.round(c.x + c.dir * 3 * s - (BUBBLE[0].length / 2) * s);
+    const top = Math.round(c.y - (HEAD + 3 + BUBBLE.length) * s);
+    const cell = (i, j, key) => {
+      ctx.fillStyle = ink[key];
+      ctx.fillRect(left + i * s, top + j * s, s, s);
+    };
+    const stampAt = (rows, x, y) => rows.forEach((row, j) => [...row].forEach((k, i) => k !== '.' && cell(x + i, y + j, k)));
+    stampAt(BUBBLE, 0, 0);
+    stampAt(b.saying, 2, 2);
+    // Tail on the speaker's side of the bubble.
+    const t = Math.round(BUBBLE[0].length / 2 - c.dir * 3);
+    const h = BUBBLE.length;
+    cell(t, h - 1, 'W');
+    cell(t - 1, h, 'K');
+    cell(t, h, 'W');
+    cell(t + 1, h, 'K');
+    cell(t - c.dir, h + 1, 'K');
+  }
+}
+
+const GAMES = [BallGame, SwordDuel, DanceDuo, CoffeeChat];
 
 // Idle Clawds free to start a game: not walking, not asleep, not already playing.
 function available(critter, now) {
@@ -602,6 +695,15 @@ function freeRug(zone, players) {
   for (let i = 0; i + 2 < spots.length; i += 3) {
     const rug = spots.slice(i, i + 3);
     if (rug.every((s) => !s.occupant || players.includes(s.occupant))) return rug;
+  }
+  return null;
+}
+
+// A coffee counter free but for the players, its machine included.
+function freeCounter(zone, players) {
+  for (const counter of zone.stations.chat ?? []) {
+    const spots = [counter, counter.near];
+    if (spots.every((s) => !s.occupant || players.includes(s.occupant))) return spots;
   }
   return null;
 }
@@ -739,7 +841,7 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       if (Math.random() >= PAIR_CHANCE) continue;
       const free = [...critters.values()].filter((c) => c.zone === zone && available(c, now));
       // A game already on in this zone draws a spectator or two before a new one starts.
-      const game = duos.find((d) => d.started && d.players[0].zone === zone && d.watchers.length < 2);
+      const game = duos.find((d) => d.started && d.watchable && d.players[0].zone === zone && d.watchers.length < 2);
       if (game && free.length) {
         game.watch(pick(free));
         continue;
@@ -823,6 +925,7 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       }
       for (const light of lit) drawLight(ctx, light, night);
     }
+    for (const duo of duos) duo.drawOver(ctx, now);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';

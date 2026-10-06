@@ -82,20 +82,36 @@ const SHELF = sprite([
   'DD............DD',
 ]);
 
-const COFFEE = sprite([
-  'KKKKKKKKKK',
-  'KGGGGGGGGK',
-  'KGKKKKKKGK',
-  'KGKSSSSKGK',
-  'KGKKKKKKGK',
-  'KGGGGGGRGK',
-  'KGG....GGK',
-  'KGG.WW.GGK',
-  'KGG.WW.GGK',
-  'KGGGGGGGGK',
-  'KKKKKKKKKK',
-  'KK......KK',
+// Coffee counter: the machine on the left of the worktop, mugs and a sugar jar,
+// a cupboard underneath.
+const COUNTER = sprite([
+  '..KKKKKKKK..............',
+  '..KGGGGGGK..............',
+  '..KGKSSKGK..............',
+  '..KGGGGRGK..............',
+  '..KGG..GGK..............',
+  '..KGG..GGK....L...L.....',
+  '..KGGWWGGK...L...L...WW.',
+  '..KKKKKKKK..BBB.RRR.HWWH',
+  'OOOOOOOOOOOOOOOOOOOOOOOO',
+  'DDDDDDDDDDDDDDDDDDDDDDDD',
+  'DAAAAAAAAAADDAAAAAAAAAAD',
+  'DAAAAAAAAYADDAYAAAAAAAAD',
+  'DAAAAAAAAAADDAAAAAAAAAAD',
+  'DAAAAAAAAAADDAAAAAAAAAAD',
+  'DDDDDDDDDDDDDDDDDDDDDDDD',
 ]);
+const COUNTER_MACHINE = 6; // column in front of the machine
+
+// The coffee corner: one drinks alone at the machine; two chat face to face in
+// front of the counter, which takes the machine's place along with them.
+function coffeeCorner(left, base, inFront, { p, u, standing, slot, stations }) {
+  standing(COUNTER, left, base);
+  slot('coffee', left + COUNTER_MACHINE * p, inFront);
+  // Centred on the machine, so the one on the right still fits by the wall's end.
+  slot('chat', left + COUNTER_MACHINE * p, inFront + u(6));
+  stations.chat.at(-1).near = stations.coffee.at(-1);
+}
 
 const RADIO = sprite([
   '....G.......',
@@ -831,7 +847,7 @@ function seeded(text) {
   };
 }
 
-const STATIONS = ['desk', 'shelf', 'board', 'coffee', 'radio', 'beanbag', 'rug', 'front'];
+const STATIONS = ['desk', 'shelf', 'board', 'coffee', 'chat', 'radio', 'beanbag', 'rug', 'front'];
 
 // Furnishes one area (a room, or the whole shared office) and returns its
 // walkable zone and stations. Every station type always exists; quantities and
@@ -911,10 +927,9 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
   slot('board', boardLeft + u(30), wall + u(44), 0, { light: reading });
   slot('board', boardLeft + u(120), wall + u(44), 0, { light: reading });
 
-  // Along the wall, right: coffee machine, maybe a water cooler and a plant, the clock.
-  let right = x1 - u(28) - COFFEE.w * p;
-  standing(COFFEE, right, backBase);
-  slot('coffee', right + u(25), inFront);
+  // Along the wall, right: coffee corner, maybe a water cooler and a plant, the clock.
+  let right = x1 - u(28) - COUNTER.w * p;
+  coffeeCorner(right, backBase, inFront, { p, u, standing, slot, stations });
   if (chance(0.75)) {
     right -= u(20) + COOLER.w * p;
     standing(COOLER, right, backBase);
@@ -1164,9 +1179,8 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
   let kitchen = x1 - u(20) - FRIDGE.w * p;
   standing(FRIDGE, kitchen, backBase);
   slot('coffee', kitchen + u(25), inFront + u(10));
-  kitchen -= u(12) + COFFEE.w * p;
-  standing(COFFEE, kitchen, backBase);
-  slot('coffee', kitchen + u(25), inFront);
+  kitchen -= u(12) + COUNTER.w * p;
+  coffeeCorner(kitchen, backBase, inFront, { p, u, standing, slot, stations });
   kitchen -= u(12) + COOLER.w * p;
   standing(COOLER, kitchen, backBase);
   slot('coffee', kitchen + u(20), inFront);
