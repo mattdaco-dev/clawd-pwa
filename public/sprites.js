@@ -380,15 +380,30 @@ export const ANIMS = {
     label: 'Danse',
     fps: 6,
     loop: true,
+    // Sways side to side with disco arms (one up, one down) and sparkles, so it
+    // never reads as the both-arms waving of « Fait signe ».
     frames: frames(8, (f, i) => {
-      const leftUp = i % 4 < 2;
-      clawd(f, {
+      const moves = [
+        ['high', 'low'], ['high', 'low'], ['mid', 'mid'], ['low', 'high'],
+        ['low', 'high'], ['mid', 'mid'], ['high', 'low'], ['out', 'out'],
+      ];
+      const [left, right] = moves[i];
+      const p = clawd(f, {
+        dx: [0, 1, 1, 0, -1, -1, 0, 0][i],
         dy: i % 2 ? -1 : 0,
-        eyes: 'happy',
-        left: leftUp ? 'high' : 'out',
-        right: leftUp ? 'out' : 'high',
-        legs: i % 2 ? 'tuck' : i % 4 === 0 ? 'tapL' : 'tapR',
+        eyes: i % 4 === 3 ? 'closed' : 'happy',
+        left,
+        right,
+        legs: ['tapR', 'stand', 'tapL', 'stand', 'tapR', 'stand', 'tapL', 'tuck'][i],
       });
+      const sparkle = (x, y) => {
+        p(x, y, 'Y');
+        p(x - 1, y + 1, 'Y');
+        p(x + 1, y + 1, 'Y');
+        p(x, y + 2, 'Y');
+      };
+      if (i % 2 === 0) sparkle(-2, -4 + (i % 4));
+      else sparkle(20, -3 - (i % 3));
     }),
   },
   ball: {
