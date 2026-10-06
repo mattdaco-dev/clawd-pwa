@@ -77,6 +77,23 @@ route();
 const events = new EventSource('/events');
 events.onopen = () => live.setConnected(true);
 events.onerror = () => live.setConnected(false);
-events.onmessage = (e) => live.setSnapshot(JSON.parse(e.data));
+events.onmessage = (e) => {
+  const snapshot = JSON.parse(e.data);
+  live.setSnapshot(snapshot);
+  showWaiting(snapshot);
+};
+
+// Agents waiting for an input are the only ones that need you: count them in
+// the tab title and on the installed app's icon.
+function showWaiting(snapshot) {
+  const n = snapshot.sessions
+    .flatMap((s) => [s, ...s.subagents])
+    .filter((a) => a.state === 'waiting').length;
+  document.title = n ? `(${n}) Clawd` : 'Clawd';
+  try {
+    if (n) navigator.setAppBadge?.(n)?.catch(() => {});
+    else navigator.clearAppBadge?.()?.catch(() => {});
+  } catch {}
+}
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
