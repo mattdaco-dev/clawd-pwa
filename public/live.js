@@ -1,7 +1,8 @@
 import { ANIMS, BALL, FRAME_H, FRAME_W, PASS } from './sprites.js';
 import { PALETTES, cycleDone, drawFrame, fitCanvas, frameIndex } from './render.js';
 import { DECORS, DEFAULT_SETTINGS } from './decor.js';
-import { drawLight } from './office.js';
+import { drawLight, seasonOf } from './office.js';
+import { currentWeather } from './weather.js';
 
 // Subagents are drawn one pixel size smaller than their main agent.
 const scaleFor = (kind, px) => (kind === 'main' ? px : Math.max(2, px - 1));
@@ -841,10 +842,11 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
   function ensureOffice(sessions) {
     const names = sessions.map((s) => s.name || s.id.slice(0, 8));
     const { decor, layout, px } = settings;
-    const key = `${decor}|${layout}|${px}|${width}x${viewHeight}|${names.join('|')}`;
+    const season = seasonOf(sceneDate());
+    const key = `${decor}|${layout}|${px}|${season}|${width}x${viewHeight}|${names.join('|')}`;
     if (key === officeKey) return;
     officeKey = key;
-    office = (DECORS[decor] ?? DECORS[DEFAULT_SETTINGS.decor]).build(width, viewHeight, names, { layout, px });
+    office = (DECORS[decor] ?? DECORS[DEFAULT_SETTINGS.decor]).build(width, viewHeight, names, { layout, px, season });
     height = office.height;
     ctx = fitCanvas(canvas, width, height);
     for (const critter of critters.values()) {
@@ -938,7 +940,7 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
 
     const date = sceneDate();
     ctx.drawImage(office.background, 0, 0, width, height);
-    office.overlay(ctx, date);
+    office.overlay(ctx, date, currentWeather());
 
     // Furniture and Clawds back to front, so whoever stands lower is drawn over the rest.
     const scene = [

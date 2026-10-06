@@ -39,6 +39,17 @@ rétroéclairage de l'écran selon le bureau, lampe sur pied près de la bibliot
 blanc. Elle s'éteint quand il s'en va. Après 20 h, les Clawd au repos s'endorment au bout de 30 s au lieu
 de 2 minutes. Pour voir la nuit en plein jour, ouvrir `/?heure=22`.
 
+Les fenêtres montrent la météo du moment à Luxembourg (Open-Meteo, sans clé, rafraîchie toutes les
+30 min) : nuages, brouillard, pluie, neige, orage avec éclairs. Pour en forcer une :
+`/?meteo=pluie` (ou `soleil`, `nuages`, `brouillard`, `neige`, `orage`). Coordonnées dans
+`public/weather.js`. En octobre, des citrouilles s'allument la nuit ; de décembre à l'Épiphanie, un
+sapin clignote près de la porte. `/?saison=halloween` ou `/?saison=noel` pour les voir hors saison.
+
+Un outil qui échoue (`PostToolUseFailure`, hors annulation) fait sursauter son Clawd sous une croix
+rouge. Après 10 min de travail d'affilée, un Clawd au clavier bâille et s'étire de temps en temps, et
+toutes les 30 min il part prendre un café. Pendant une compaction du contexte (`PreCompact` à
+`PostCompact`), il passe ses notes à la broyeuse.
+
 Le titre de l'onglet et l'icône de la PWA installée affichent le nombre d'agents qui attendent un
 input.
 
@@ -52,6 +63,7 @@ clair. Le hook est déclaré `async`, il ne bloque jamais Claude : sortie vide, 
 - `server.js` : traduit les événements en état par agent (`working`, `waiting`, `idle`) et le diffuse en SSE.
 - `public/sprites.js` : toutes les animations, en grilles de pixels composées par code.
 - `public/live.js` : la scène plein écran (vues Live et Démo), `public/gallery.js` : la galerie.
+- `public/weather.js` : la météo affichée aux fenêtres.
 - `public/decor.js` : le registre des décors ; un décor fournit le fond, une zone par session avec ses
   postes, les meubles triés en profondeur avec les Clawd et un calque redessiné à chaque image.
 - `public/office.js` : le décor open space (salles ou bureau partagé, aménagement tiré au hasard par

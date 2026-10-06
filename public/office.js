@@ -180,6 +180,87 @@ const BOARD = sprite([
   '..GGGGGGGGGGGGGGGGGGGG..',
 ]);
 
+// Season decorations: carved pumpkins in October, a Christmas tree and its
+// presents from December to Epiphany. `?saison=halloween` or `?saison=noel` forces one.
+const PUMPKIN = sprite([
+  '...Q...',
+  '.ooQoo.',
+  'onooono',
+  'oKonoKo',
+  'onooono',
+  'oKKKKKo',
+  '.onono.',
+]);
+// The carved face, lit from inside at night.
+const PUMPKIN_FACE = PUMPKIN.cells.filter(([, , c]) => c === 'K').map(([x, y]) => [x, y, 'Y']);
+
+const TREE = sprite([
+  '.....Y.....',
+  '....YYY....',
+  '.....P.....',
+  '....PPP....',
+  '...PPQPP...',
+  '....PPP....',
+  '...PPPPP...',
+  '..PPQPPPP..',
+  '...PPPPP...',
+  '..PPPPQPP..',
+  '.PPPPPPPPP.',
+  '..PPPPPPP..',
+  '.PPQPPPPPP.',
+  'PPPPPPPQPPP',
+  '....HHH....',
+  '....HHH....',
+]);
+// Fairy lights, on a few needles of each tier.
+const TREE_LIGHTS = [[5, 3, 'R'], [4, 6, 'Y'], [6, 7, 'B'], [3, 9, 'Y'], [7, 10, 'R'], [2, 12, 'B'], [5, 12, 'Y'], [8, 13, 'R'], [1, 13, 'Y']];
+const GIFTS = sprite([
+  '..Y....Y..',
+  '.RYR..BYB.',
+  '.RYR..BYB.',
+  'RRYRRBBYBB',
+  'RRYRRBBYBB',
+]);
+
+export function seasonOf(date) {
+  const forced = new URLSearchParams(location.search).get('saison');
+  if (forced) return forced;
+  const m = date.getMonth();
+  const d = date.getDate();
+  if (m === 9 || (m === 10 && d <= 2)) return 'halloween';
+  if (m === 11 || (m === 0 && d <= 6)) return 'noel';
+  return null;
+}
+
+// Pumpkins and trees are props; their lights are also redrawn over the night tint.
+function pumpkin(left, base, { p, props, glows }) {
+  const top = base - PUMPKIN.h * p;
+  props.push({ base: Math.round(base), draw: (ctx) => drawSprite(ctx, PUMPKIN, left, top, p) });
+  glows.push({ cells: PUMPKIN_FACE, left, top, p, x: left + 3.5 * p, y: top + 4 * p, r: 10 });
+}
+
+function christmasTree(left, base, { p, props, glows }) {
+  const top = base - TREE.h * p;
+  const lights = (ctx, now) => {
+    const step = Math.floor(now / 600);
+    TREE_LIGHTS.forEach(([x, y, c], i) => {
+      if ((i + step) % 3 === 0) return; // a third of them off at a time
+      ctx.fillStyle = INK[c];
+      ctx.fillRect(Math.round(left) + x * p, Math.round(top) + y * p, p, p);
+    });
+  };
+  props.push({
+    base: Math.round(base),
+    draw: (ctx) => {
+      drawSprite(ctx, TREE, left, top, p);
+      lights(ctx, performance.now());
+    },
+  });
+  glows.push({ draw: lights, x: left + 5.5 * p, y: top + 9 * p, r: 16 });
+  const giftsLeft = left + TREE.w * p - 2 * p;
+  props.push({ base: Math.round(base) + 1, draw: (ctx) => drawSprite(ctx, GIFTS, giftsLeft, base - GIFTS.h * p + p, p) });
+}
+
 // Window shapes: F is the frame, S the glass repainted with the sky of the hour.
 // Each room or open space draws one shape and one frame colour for all its windows.
 const WINDOW_SHAPES = [
@@ -941,7 +1022,8 @@ const STATIONS = ['desk', 'shelf', 'board', 'coffee', 'chat', 'radio', 'beanbag'
 // Furnishes one area (a room, or the whole shared office) and returns its
 // walkable zone and stations. Every station type always exists; quantities and
 // positions vary with the seed, which keeps a layout stable across rebuilds.
-function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p, u, props, clocks, skies, lamps }) {
+function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env) {
+  const { p, u, props, clocks, skies, lamps, season } = env;
   const W = x1 - x0;
   const wallH = u(110);
   const wall = top + wallH;
@@ -979,16 +1061,20 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
     props.push({ base: Math.round(top) + s.h * p, draw: (ctx) => drawSprite(ctx, s, left, top, p) });
   };
   const standing = (s, left, base) => prop(s, left, base - s.h * p);
-  const scatter = (s, yMin, yMax) => {
-    const w = s.w * p;
-    const h = s.h * p;
-    for (let tries = 0; tries < 30; tries++) {
+  // A free patch of floor w x h, reserved; null when nothing fits.
+  const freeSpot = (w, h, yMin, yMax, tries = 30) => {
+    while (tries-- > 0) {
       const left = between(x0 + u(16), x1 - u(16) - w);
       const base = between(yMin, yMax);
       if (!fits(left - u(10), base - h, w + u(20), h + u(10))) continue;
       reserve(left - u(10), base - h, w + u(20), h + u(10));
-      return standing(s, left, base);
+      return { left, base };
     }
+    return null;
+  };
+  const scatter = (s, yMin, yMax) => {
+    const at = freeSpot(s.w * p, s.h * p, yMin, yMax);
+    if (at) standing(s, at.left, at.base);
   };
 
   // Along the wall, left: the door in the corner, bookshelves, the whiteboard.
@@ -996,6 +1082,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
   const inFront = backBase + u(36);
   let cursor = x0 + u(24);
   drawDoor(g, cursor, wall, { p, u, sign: false });
+  if (season === 'halloween') pumpkin(cursor + doorWidth(p) + u(2), wall + u(26), env);
   cursor += doorWidth(p) + u(20);
   const shelfCount = int(1, W >= u(900) ? 3 : W >= u(560) ? 2 : 1);
   const firstShelf = cursor;
@@ -1157,6 +1244,16 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
   for (let i = 0; i < fronts; i++) slot('front', x0 + W * 0.25 + i * u(110), floorBottom - u(2));
   reserve(x0 + W * 0.22, floorBottom - u(110), fronts * u(110) + W * 0.06, u(110));
 
+  // The season's decorations, on free floor before the plants take it.
+  if (season === 'halloween') {
+    const at = freeSpot(PUMPKIN.w * p, PUMPKIN.h * p, wall + u(100), floorBottom - u(4), 100);
+    if (at) pumpkin(at.left, at.base, env);
+  }
+  if (season === 'noel') {
+    const at = freeSpot(TREE.w * p + GIFTS.w * p, TREE.h * p, wall + u(100), floorBottom - u(4), 200);
+    if (at) christmasTree(at.left, at.base, env);
+  }
+
   for (let i = int(2, 5) * sections; i > 0; i--) scatter(look.plant(), wall + u(80), floorBottom - u(4));
   if (chance(0.5)) scatter(CABINET, wall + floor * 0.5, floorBottom - u(4));
 
@@ -1168,7 +1265,8 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
 // meeting corner on the left, islands of desks in the middle split by low
 // bookcases, kitchen and lounge on the right, a clear walkway at the front.
 // Structured rather than scattered; the seed only picks variants and fabrics.
-function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies, lamps }) {
+function furnishShared(g, { x0, x1, top, bottom }, env) {
+  const { p, u, props, clocks, skies, lamps, season } = env;
   const W = x1 - x0;
   const wallH = u(110);
   const wall = top + wallH;
@@ -1471,7 +1569,13 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
   let wx = wallFrom + u(between(0, 40));
   while (wx + winW <= wallTo) {
     if (doorX !== null && wx + winW > doorX) {
-      drawDoor(g, wx + u(20), wall, { p, u });
+      const doorLeft = wx + u(20);
+      drawDoor(g, doorLeft, wall, { p, u });
+      if (season === 'halloween') {
+        pumpkin(doorLeft - u(8) - PUMPKIN.w * p, wall + u(26), env);
+        pumpkin(doorLeft + doorWidth(p) + u(8), wall + u(26), env);
+      }
+      if (season === 'noel') christmasTree(doorLeft + doorWidth(p) + u(16), wall + u(30), env);
       wx += u(20) + doorWidth(p) + u(between(40, 90));
       doorX = null;
       continue;
@@ -1518,14 +1622,15 @@ function canvasFor(width, height) {
 
 // Rooms: one fixed-size room per session, laid out in a grid that grows
 // downwards (the page scrolls). Shared: one office the size of the window.
-export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms' } = {}) {
+export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms', season = null } = {}) {
   const k = px / 5;
   const u = (n) => Math.round(n * k);
   const props = [];
   const clocks = [];
   const skies = []; // window panes, repainted with the sky of the hour
   const lamps = [];
-  const env = { p: px, u, props, clocks, skies, lamps };
+  const glows = []; // small lights redrawn over the night tint
+  const env = { p: px, u, props, clocks, skies, lamps, glows, season };
   const zones = [];
   let height = viewHeight;
   let background;
@@ -1564,10 +1669,12 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     zones,
     shared: layout === 'shared',
     props,
-    overlay(ctx, date) {
+    overlay(ctx, date, weather = 'clear') {
       for (const clock of clocks) drawClock(ctx, clock, date, u);
       const light = daylight(date);
-      if (light.night || light.dusk) skies.forEach((w, i) => drawSky(ctx, w, i, light, px));
+      if (light.night || light.dusk || weather !== 'clear') {
+        skies.forEach((w, i) => drawSky(ctx, w, i, light, px, weather, date.getTime()));
+      }
     },
     // Drawn over everything: the evening dims the office, lamps light up around
     // them. Returns how dark it is, so labels can switch to a light ink.
@@ -1593,6 +1700,21 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
         ctx.fillStyle = glow;
         ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
       }
+      // Pumpkin faces and fairy lights shine through the dark.
+      const now = performance.now();
+      for (const g of glows) {
+        const r = u(g.r * 5);
+        const halo = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, r);
+        halo.addColorStop(0, `rgb(255 196 90 / ${0.35 * night})`);
+        halo.addColorStop(1, 'rgb(255 196 90 / 0)');
+        ctx.fillStyle = halo;
+        ctx.fillRect(g.x - r, g.y - r, 2 * r, 2 * r);
+        if (g.draw) g.draw(ctx, now);
+        else for (const [x, y, c] of g.cells) {
+          ctx.fillStyle = INK[c];
+          ctx.fillRect(Math.round(g.left) + x * g.p, Math.round(g.top) + y * g.p, g.p, g.p);
+        }
+      }
       return night;
     },
   };
@@ -1612,13 +1734,51 @@ const DUSK_SKY = [244, 170, 120];
 const NIGHT_SKY = [31, 42, 77];
 
 // Paints the glass of a window with the sky of the hour, stars at night.
-function drawSky(ctx, { left, top, model }, index, { night, dusk }, p) {
+// How overcast each weather makes the sky, and the grey it turns to.
+const OVERCAST = { clear: 0, cloudy: 0.45, fog: 0.75, rain: 0.6, snow: 0.55, storm: 0.75 };
+const OVERCAST_GREY = { fog: [214, 218, 222], storm: [112, 120, 134] };
+
+function drawSky(ctx, { left, top, model }, index, { night, dusk }, p, weather, ms) {
   const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  const cell = (x, y) => ctx.fillRect(left + x * p, top + y * p, p, p);
   // The sky turns dark later than the room, so sunset stays orange.
-  const [r, g, b] = mix(mix(DAY_SKY, DUSK_SKY, dusk), NIGHT_SKY, Math.max(0, (night - 0.3) / 0.7));
-  ctx.fillStyle = `rgb(${r} ${g} ${b})`;
-  for (const [x, y] of model.glass) ctx.fillRect(left + x * p, top + y * p, p, p);
-  if (night < 0.6) return;
+  const darkness = Math.max(0, (night - 0.3) / 0.7);
+  const grey = mix(OVERCAST_GREY[weather] ?? [178, 186, 196], NIGHT_SKY, darkness * 0.8);
+  const [r, g, b] = mix(mix(mix(DAY_SKY, DUSK_SKY, dusk), NIGHT_SKY, darkness), grey, OVERCAST[weather]);
+  // A storm flashes now and then.
+  const flash = weather === 'storm' && ms % 7000 < 140;
+  ctx.fillStyle = flash ? '#f4f7ff' : `rgb(${r} ${g} ${b})`;
+  for (const [x, y] of model.glass) cell(x, y);
+  if (flash) return;
+
+  // Clouds drift across, a little lighter than the overcast sky.
+  if (weather === 'cloudy') {
+    const drift = Math.floor(ms / 1500);
+    ctx.fillStyle = darkness > 0.5 ? 'rgb(96 104 122)' : 'rgb(236 240 244)';
+    for (const [x, y] of model.glass) {
+      const u = (x + drift + index * 9) % 18;
+      if (y <= 4 && u < 7 && !(y === 1 && (u === 0 || u === 6)) && !(y === 4 && u > 4)) cell(x, y);
+    }
+  }
+  if (weather === 'rain' || weather === 'storm') {
+    const t = Math.floor(ms / 80);
+    ctx.fillStyle = darkness > 0.5 ? 'rgb(150 170 200)' : 'rgb(232 240 250)';
+    for (const [x, y] of model.glass) {
+      if ((x + index) % 3) continue;
+      const k = (((y - t + x * 7) % 8) + 8) % 8;
+      if (k < 2) cell(x, y);
+    }
+  }
+  if (weather === 'snow') {
+    const t = Math.floor(ms / 300);
+    ctx.fillStyle = '#ffffff';
+    for (const [x, y] of model.glass) {
+      const row = y - t;
+      const sway = Math.floor(row / 4) % 2;
+      if ((((row + x * 5) % 7) + 7) % 7 === 0 && (x + sway + index) % 3 === 0) cell(x, y);
+    }
+  }
+  if (night < 0.6 || weather !== 'clear') return;
   ctx.fillStyle = '#fff6d6';
   for (let k = 0; k < 3; k++) {
     // The same few stars in each window every night.

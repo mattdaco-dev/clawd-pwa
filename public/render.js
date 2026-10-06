@@ -32,6 +32,9 @@ const INKS = {
   Z: '#a56b6b',
   // Sword blade, a warm cream like Kirby's
   w: '#f6ecd2',
+  // Pumpkins
+  o: '#e98a2f',
+  n: '#b5611d',
 };
 
 function lighten(hex, amount) {
