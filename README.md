@@ -47,5 +47,6 @@ clair. Le hook est déclaré `async`, il ne bloque jamais Claude : sortie vide, 
   postes, les meubles triés en profondeur avec les Clawd et un calque redessiné à chaque image.
 - `public/office.js` : le décor open space (salles ou bureau partagé, aménagement tiré au hasard par
   session) et ses postes : bureau
-  pour taper, bibliothèque pour chercher, radio pour le web, tableau blanc pour réfléchir, avant-scène
-  pour attendre un input, café, tapis de jeu et poufs pour la sieste.
+  pour taper, bibliothèque et globe pour chercher et le web, tableau blanc pour réfléchir, avant-scène
+  pour attendre un input, café, radio, tapis de jeu et poufs pour la sieste. Deux Clawd au repos dans
+  la même zone se retrouvent parfois sur un tapis pour une passe de ballon (`Duo` dans `live.js`).

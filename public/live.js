@@ -1,4 +1,4 @@
-import { ANIMS, FRAME_H } from './sprites.js';
+import { ANIMS, BALL, FRAME_H, FRAME_W, PASS } from './sprites.js';
 import { PALETTES, cycleDone, drawFrame, fitCanvas, frameIndex } from './render.js';
 import { DECORS, DEFAULT_SETTINGS } from './decor.js';
 
@@ -28,6 +28,11 @@ const IDLE = [
   [{ station: 'radio', anims: ['music'] }, 20],
 ];
 const CYCLES = { working: 4, waiting: 3, idle: 2 };
+// Two idle Clawds of the same zone may meet on a rug to pass a ball around.
+const PAIR_EVERY = 3000; // ms between two pairing attempts in a zone
+const PAIR_CHANCE = 0.4;
+const PASSES = [6, 12]; // passes before the game ends, drawn at random
+const BALL_SPEED = 70; // sprite pixels per second
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -73,6 +78,7 @@ class Critter {
 
   // The office was rebuilt: forget the old places and pick new ones.
   relocate() {
+    this.duo?.end(false);
     this.slot = null;
     this.plan = null;
     this.target = null;
@@ -82,6 +88,7 @@ class Critter {
   leave() {
     if (this.leaving) return;
     this.leaving = true;
+    this.duo?.end(false);
     this.release();
     this.target = null;
     this.play('leave', 1, true);
@@ -99,6 +106,8 @@ class Critter {
     this.locked = false;
 
     if (agent.state !== this.state || agent.activity !== this.activity) {
+      this.duo?.end(false);
+      this.replan = false; // decided right below
       const wasWorking = this.state === 'working';
       this.state = agent.state;
       this.activity = agent.activity;
@@ -110,6 +119,10 @@ class Critter {
       return this.decide(now, zone);
     }
 
+    if (this.duo) {
+      if (this.target) this.walk(dt);
+      return;
+    }
     if (this.replan) {
       this.replan = false;
       this.decide(now, zone);
@@ -173,7 +186,18 @@ class Critter {
     this.x = this.target.x;
     this.y = this.target.y;
     this.target = null;
-    this.perform();
+    if (this.duo) {
+      this.dir = this.duoDir;
+      this.play('pass-ready', Infinity);
+    } else {
+      this.perform();
+    }
+  }
+
+  // Centre of the ball in its hands, as drawn by « pass-throw ».
+  hands(y) {
+    const fx = this.dir > 0 ? PASS.x : FRAME_W - PASS.x;
+    return { x: this.x + (fx - CENTER) * this.scale, y: this.y + (y - FEET) * this.scale };
   }
 
   draw(ctx, now) {
@@ -190,6 +214,110 @@ class Critter {
     const left = Math.round(this.x - CENTER * this.scale);
     drawFrame(ctx, frame, left, y - FEET * this.scale, this.scale, PALETTES[this.kind], this.dir < 0);
   }
+}
+
+// A ball game between two Clawds on the left and right spots of a rug.
+class Duo {
+  constructor(players, slots) {
+    this.players = players;
+    this.slots = slots;
+    this.passes = PASSES[0] + Math.floor(Math.random() * (PASSES[1] - PASSES[0] + 1));
+    this.holder = null;
+    this.ball = null;
+    for (const slot of slots) slot.occupant = this;
+    players.forEach((c, i) => {
+      c.release();
+      c.plan = null;
+      c.duo = this;
+      c.duoDir = i === 0 ? 1 : -1;
+      c.walkTo(slots[i === 0 ? 0 : slots.length - 1].spot(c.scale), c.zone);
+    });
+  }
+
+  update(now) {
+    if (this.over) return;
+    if (!this.holder) {
+      // Wait until both stand on their spot, then the first one serves.
+      if (this.players.some((c) => c.target)) return;
+      return this.serve(this.players[Math.floor(Math.random() * 2)], now);
+    }
+    if (this.ball) {
+      const t = (now - this.ball.t0) / this.ball.ms;
+      if (t < 1) return;
+      this.ball = null;
+      if (--this.passes <= 0) return this.end(true);
+      return this.serve(this.players.find((c) => c !== this.holder), now);
+    }
+    const anim = ANIMS['pass-throw'];
+    if ((now - this.holder.t0) * anim.fps / 1000 < PASS.releaseFrame) return;
+    const from = this.holder.hands(PASS.releaseY);
+    const catcher = this.players.find((c) => c !== this.holder);
+    const to = catcher.hands(PASS.catchY);
+    const scale = Math.min(...this.players.map((c) => c.scale));
+    const dist = Math.hypot(to.x - from.x, to.y - from.y);
+    this.ball = { from, to, scale, t0: now, ms: Math.max(500, (dist / (BALL_SPEED * scale)) * 1000), arc: dist * 0.35 };
+    this.holder.play('pass-ready', Infinity);
+  }
+
+  // The catcher gets the ball: frame 0 of « pass-throw » holds it.
+  serve(player, now) {
+    this.holder = player;
+    player.dir = player.duoDir;
+    player.play('pass-throw');
+    player.t0 = now;
+  }
+
+  // played: the game reached its last pass; otherwise one of them was called away.
+  end(played) {
+    if (this.over) return;
+    this.over = true;
+    this.ball = null;
+    for (const slot of this.slots) if (slot.occupant === this) slot.occupant = null;
+    for (const c of this.players) {
+      c.duo = null;
+      c.target = null;
+      c.plan = null;
+      if (c.leaving) continue;
+      if (played) c.play('jump', 1, true);
+      else c.replan = true;
+    }
+  }
+
+  // Back-to-front key and drawing of the ball in flight.
+  get y() {
+    return Math.max(...this.players.map((c) => c.y)) + 1;
+  }
+
+  draw(ctx, now) {
+    if (!this.ball) return;
+    const { from, to, scale, t0, ms, arc } = this.ball;
+    const t = Math.min(1, (now - t0) / ms);
+    const x = from.x + (to.x - from.x) * t;
+    const y = from.y + (to.y - from.y) * t - arc * 4 * t * (1 - t);
+    const left = Math.round(x - 2 * scale);
+    const top = Math.round(y - 2 * scale);
+    BALL.forEach((row, j) => [...row].forEach((c, i) => {
+      if (c === '.') return;
+      ctx.fillStyle = c === 'W' ? '#ffffff' : '#e5484d';
+      ctx.fillRect(left + i * scale, top + j * scale, scale, scale);
+    }));
+  }
+}
+
+// Idle Clawds free to start a game: not walking, not asleep, not already playing.
+function available(critter, now) {
+  return !critter.leaving && !critter.duo && !critter.locked && !critter.target &&
+    critter.state === 'idle' && critter.plan && critter.plan !== SLEEP && now - critter.idleSince < SLEEP_AFTER;
+}
+
+// A rug with nobody on it but the players (spots come in threes, left to right).
+function freeRug(zone, players) {
+  const spots = zone.stations.rug ?? [];
+  for (let i = 0; i + 2 < spots.length; i += 3) {
+    const rug = spots.slice(i, i + 3);
+    if (rug.every((s) => !s.occupant || players.includes(s.occupant))) return rug;
+  }
+  return null;
 }
 
 function randomSpot(zone, scale) {
@@ -247,6 +375,8 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
   const status = root.querySelector('.status');
 
   const critters = new Map();
+  let duos = [];
+  const lastPairing = new Map(); // zone -> time of the last pairing attempt
   let snapshot = { sessions: [] };
   let connected = false;
   let ctx;
@@ -291,6 +421,22 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
     }
   }
 
+  function pairUp(now) {
+    for (const zone of office.zones) {
+      if (now - (lastPairing.get(zone) ?? 0) < PAIR_EVERY) continue;
+      lastPairing.set(zone, now);
+      if (Math.random() >= PAIR_CHANCE) continue;
+      const free = [...critters.values()].filter((c) => c.zone === zone && available(c, now));
+      if (free.length < 2) continue;
+      const a = free.splice(Math.floor(Math.random() * free.length), 1)[0];
+      const b = free[Math.floor(Math.random() * free.length)];
+      const rug = freeRug(zone, [a, b]);
+      if (!rug) continue;
+      // Whoever stands further left takes the left spot.
+      duos.push(new Duo(a.x <= b.x ? [a, b] : [b, a], rug));
+    }
+  }
+
   function tick(now) {
     const dt = Math.min(now - last, 100);
     last = now;
@@ -315,6 +461,10 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       critter.update(now, dt, agent, zone);
     }
 
+    for (const duo of duos) duo.update(now);
+    duos = duos.filter((d) => !d.over);
+    pairUp(now);
+
     const alive = new Set(agents.map((a) => a.key));
     for (const [key, critter] of critters) {
       if (alive.has(key)) continue;
@@ -330,6 +480,7 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
     const scene = [
       ...office.props.map((p) => ({ y: p.base, draw: () => p.draw(ctx) })),
       ...[...critters.values()].map((c) => ({ y: c.y, draw: () => c.draw(ctx, now) })),
+      ...duos.map((d) => ({ y: d.y, draw: () => d.draw(ctx, now) })),
     ].sort((a, b) => a.y - b.y);
     for (const item of scene) item.draw();
 

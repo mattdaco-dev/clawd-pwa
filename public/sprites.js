@@ -203,6 +203,13 @@ function globe(p, t) {
 
 const Z = ['KKKK', '..K.', '.K..', 'KKKK'];
 const BALL = ['.RR.', 'RWRR', 'RRRR', '.RR.'];
+// Top row of the ball held by « pass-throw » at each frame, relative to Clawd;
+// null once thrown. Frame 0 is the catch, frame 2 the release.
+const PASS_BALL = [1, 2, -1, null, null];
+// Where the scene catches and releases the ball, in frame pixels: the centre of
+// the held ball when facing right (FRAME_W - x when flipped).
+export const PASS = { x: OX + 18, catchY: OY + PASS_BALL[0] + 2, releaseY: OY + PASS_BALL[2] + 2, releaseFrame: 3 };
+export { BALL };
 const RING = [[-2, 1], [0, -3], [9, -4], [17, -3], [20, 2], [20, 8], [-2, 8], [4, -4], [14, -4]];
 const SPARKLES = [[-1, -1], [19, -1], [0, 9], [18, 8], [9, -3]];
 const CONFETTI = [
@@ -422,6 +429,32 @@ export const ANIMS = {
       stamp(p, 7, by - 3, BALL);
     }),
   },
+  // Ball passing between two Clawds, facing right; the scene flips the one on
+  // the right and flies the ball between them (see PASS_BALL for its spots).
+  'pass-throw': {
+    label: 'Fait une passe',
+    fps: 8,
+    loop: false,
+    frames: frames(5, (f, i) => {
+      const p = clawd(f, {
+        dy: i === 1 ? 1 : 0,
+        eyes: i >= 3 ? 'happy' : 'right',
+        left: ['mid', 'out', 'mid', 'high', 'mid'][i],
+        right: ['mid', 'out', 'mid', 'high', 'mid'][i],
+        legs: i === 3 ? 'tapR' : 'stand',
+      });
+      const top = PASS_BALL[i];
+      if (top !== null) stamp(p, 16, top, BALL);
+    }),
+  },
+  'pass-ready': {
+    label: 'Attend la passe',
+    fps: 4,
+    loop: true,
+    frames: frames(4, (f, i) => {
+      clawd(f, { eyes: 'right', left: 'mid', right: 'mid', legs: i % 2 ? 'tapL' : 'stand' });
+    }),
+  },
   sleep: {
     label: 'Dort',
     fps: 3,
@@ -536,6 +569,8 @@ export const GROUPS = [
       ['jump', 'Jeu'],
       ['dance', 'Jeu'],
       ['ball', 'Jeu'],
+      ['pass-throw', 'Passe de ballon, à deux sur un tapis'],
+      ['pass-ready', 'Attend que l\'autre renvoie le ballon'],
       ['sleep', '2 minutes sans activité'],
     ],
   },
