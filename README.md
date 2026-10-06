@@ -13,10 +13,14 @@ Les états viennent des hooks de Claude Code, envoyés à un petit serveur local
 ## Lancer
 
 ```sh
-npm start                          # serveur sur http://localhost:4777
-python3 scripts/install-hooks.py   # branche le hook dans ~/.claude/settings.json (sauvegarde avant écriture)
-python3 scripts/install-hooks.py --uninstall
+python3 scripts/install-service.py   # serveur en agent launchd : démarre au login, relancé s'il tombe
+python3 scripts/install-hooks.py     # branche le hook dans ~/.claude/settings.json (sauvegarde avant écriture)
 ```
+
+Les deux scripts acceptent `--uninstall`. Pour lancer le serveur à la main à la place : `npm start`.
+
+Le service écrit le chemin absolu de `node` dans le plist (launchd ne voit pas nvm) : relancer
+`install-service.py` après un changement de version de Node. Journal du serveur : `logs/server.log`.
 
 Ouvrir http://localhost:4777 dans Chrome, puis « Installer l'application » pour en faire une PWA.
 La case « Démo » de la vue Live joue un scénario sans Claude Code ; la vue Galerie montre toutes
