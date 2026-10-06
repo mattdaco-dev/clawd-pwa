@@ -20,6 +20,16 @@ const INKS = {
   A: '#b8b3a7',
   P: '#6aa863',
   Q: '#3f7a44',
+  // Upholstery and pots, light and dark tone of each fabric
+  I: '#5b7bb0',
+  T: '#c8664a',
+  U: '#8f4632',
+  M: '#d9a441',
+  V: '#a07425',
+  F: '#8fae8b',
+  J: '#5c7a59',
+  X: '#d9a0a0',
+  Z: '#a56b6b',
 };
 
 function lighten(hex, amount) {

@@ -151,34 +151,128 @@ const BOARD = sprite([
 const WINDOW = sprite(Array.from({ length: 14 }, (_, y) =>
   y === 0 || y === 13 || y === 6 ? 'W'.repeat(20) : `W${'S'.repeat(8)}WW${'S'.repeat(8)}W`));
 
-function paintArea(g, x, y, w, h, wallH, u) {
-  g.fillStyle = '#e9e3d4';
-  g.fillRect(x, y, w, wallH);
-  g.fillStyle = '#d3cab6';
-  g.fillRect(x, y + wallH - u(6), w, u(6));
-  g.fillStyle = '#f4f1ea';
-  g.fillRect(x, y + wallH, w, h - wallH);
-  g.fillStyle = '#ebe6db';
-  const tile = u(56);
-  for (let ty = y + wallH + tile; ty < y + h; ty += tile) g.fillRect(x, ty, w, 1);
-  for (let tx = x + tile; tx < x + w; tx += tile) g.fillRect(tx, y + wallH, 1, h - wallH);
-}
-
-const RUGS = [
-  ['#d98b5f', '#efc98f', '#e4b276'],
-  ['#5f7fb8', '#c9d6ee', '#b3c4e6'],
-  ['#6f9a5f', '#d6e6c4', '#c2d9ab'],
+// Ambiances: a wall, a floor and the fabrics, rug colours and pots that go
+// with them. Each room draws one; everything in the room follows it.
+const THEMES = [
+  { name: 'crème', finishes: ['wood', 'white'], wall: '#ece6d8', wallLow: '#e2dac8', wallStyle: 'plain', base: '#d3cab6',
+    floor: '#f5f1e8', line: '#ebe5d8', floorStyle: 'tiles',
+    fabrics: ['denim', 'mustard', 'sage'], rugs: ['terracotta', 'denim', 'cream'], pots: ['H', 'T'] },
+  { name: 'sauge', finishes: ['wood', 'white'], wall: '#dde5d6', wallLow: '#cdd8c4', wallStyle: 'wainscot', base: '#b4c2a8',
+    floor: '#ece1cb', line: '#ddcfb3', floorStyle: 'planks',
+    fabrics: ['terracotta', 'mustard', 'rose'], rugs: ['cream', 'terracotta', 'mustard'], pots: ['T', 'H'] },
+  { name: 'terracotta', finishes: ['wood'], wall: '#f1ddcf', wallLow: '#e9cdb9', wallStyle: 'plain', base: '#d6b59e',
+    floor: '#f7f0e7', line: '#ecdfd2', floorStyle: 'tiles',
+    fabrics: ['sage', 'denim', 'mustard'], rugs: ['sage', 'denim', 'cream'], pots: ['T', 'A'] },
+  { name: 'bleu nuit', finishes: ['dark', 'wood'], wall: '#cfd8e3', wallLow: '#bcc8d6', wallStyle: 'wainscot', base: '#a3b2c4',
+    floor: '#dfcdab', line: '#cfba93', floorStyle: 'planks',
+    fabrics: ['mustard', 'terracotta', 'rose'], rugs: ['mustard', 'terracotta', 'cream'], pots: ['K', 'A'] },
+  { name: 'scandinave', finishes: ['white'], wall: '#f3f1ec', wallLow: '#e9e6df', wallStyle: 'stripes', base: '#dcd8cf',
+    floor: '#efe5d4', line: '#e3d6c0', floorStyle: 'planks',
+    fabrics: ['gray', 'sage', 'rose'], rugs: ['gray', 'sage', 'rose'], pots: ['A', 'G'] },
+  { name: 'rose poudré', finishes: ['white', 'wood'], wall: '#f2e2de', wallLow: '#ead2cd', wallStyle: 'stripes', base: '#d9bcb5',
+    floor: '#f5eee8', line: '#ecdfd7', floorStyle: 'carpet',
+    fabrics: ['sage', 'denim', 'gray'], rugs: ['sage', 'denim', 'gray'], pots: ['T', 'A'] },
 ];
 
-function paintRug(g, cx, cy, w, h, [border, fill, stripe], p) {
+function paintArea(g, x, y, w, h, wallH, u, theme) {
+  const wallBottom = y + wallH;
+  g.fillStyle = theme.wall;
+  g.fillRect(x, y, w, wallH);
+  g.fillStyle = theme.wallLow;
+  if (theme.wallStyle === 'wainscot') {
+    const rail = y + Math.round(wallH * 0.55);
+    g.fillRect(x, rail, w, wallBottom - rail);
+    g.fillStyle = theme.base;
+    g.fillRect(x, rail, w, Math.max(2, u(3)));
+  } else if (theme.wallStyle === 'stripes') {
+    for (let sx = x + u(12); sx < x + w; sx += u(28)) g.fillRect(sx, y, u(12), wallH);
+  }
+  g.fillStyle = theme.base;
+  g.fillRect(x, wallBottom - u(6), w, u(6));
+
+  g.fillStyle = theme.floor;
+  g.fillRect(x, wallBottom, w, h - wallH);
+  g.fillStyle = theme.line;
+  const floorH = y + h - wallBottom;
+  if (theme.floorStyle === 'tiles') {
+    const tile = u(56);
+    for (let ty = wallBottom + tile; ty < y + h; ty += tile) g.fillRect(x, ty, w, 1);
+    for (let tx = x + tile; tx < x + w; tx += tile) g.fillRect(tx, wallBottom, 1, floorH);
+  } else if (theme.floorStyle === 'planks') {
+    const plank = u(22);
+    const length = u(150);
+    for (let row = 0, ty = wallBottom; ty < y + h; row++, ty += plank) {
+      g.fillRect(x, ty, w, 1);
+      for (let tx = x + ((row * 59) % length); tx < x + w; tx += length) g.fillRect(tx, ty, 1, plank);
+    }
+  } else {
+    // Carpet: a quiet, regular speckle.
+    const step = u(14);
+    for (let row = 0, ty = wallBottom + step / 2; ty < y + h; row++, ty += step) {
+      for (let tx = x + ((row % 2) * step) / 2; tx < x + w; tx += step) g.fillRect(tx, ty, 2, 2);
+    }
+  }
+}
+
+const RUG_COLORS = {
+  terracotta: ['#c8664a', '#efc9a8', '#e0a983'],
+  denim: ['#4f6d9e', '#cdd8ea', '#a9bcd9'],
+  sage: ['#6f8f6b', '#d8e6d2', '#b9d0b2'],
+  mustard: ['#c4912f', '#f2dca6', '#e6c378'],
+  gray: ['#8f8b82', '#e6e3dc', '#c9c5bb'],
+  rose: ['#b97a7a', '#f3d9d6', '#e5b8b4'],
+  cream: ['#bfae8f', '#f3ebda', '#e3d6bc'],
+};
+const RUG_STYLES = ['stripes', 'frame', 'checker', 'diamonds', 'round'];
+
+// Pixel ellipse, row by row so its edge stays on the pixel grid.
+function pixelEllipse(g, cx, cy, rx, ry, color, p) {
+  g.fillStyle = color;
+  for (let dy = -ry + p / 2; dy < ry; dy += p) {
+    const half = Math.floor((rx * Math.sqrt(1 - (dy / ry) ** 2)) / p) * p;
+    if (half > 0) g.fillRect(Math.round(cx - half), Math.round(cy + dy - p / 2), half * 2, p);
+  }
+}
+
+function paintRug(g, cx, cy, w, h, { colors: [border, fill, accent], style }, p) {
+  w = Math.round(w / p) * p;
+  h = Math.round(h / p) * p;
   const left = Math.round(cx - w / 2);
   const top = Math.round(cy - h / 2);
+  if (style === 'round') {
+    pixelEllipse(g, cx, cy, w / 2, h / 2, border, p);
+    pixelEllipse(g, cx, cy, w / 2 - p, h / 2 - p, fill, p);
+    pixelEllipse(g, cx, cy, w / 2 - 3 * p, h / 2 - 3 * p, accent, p);
+    pixelEllipse(g, cx, cy, w / 2 - 4 * p, h / 2 - 4 * p, fill, p);
+    return;
+  }
   g.fillStyle = border;
   g.fillRect(left, top, w, h);
   g.fillStyle = fill;
   g.fillRect(left + p, top + p, w - 2 * p, h - 2 * p);
-  g.fillStyle = stripe;
-  for (let x = left + 3 * p; x < left + w - 3 * p; x += 4 * p) g.fillRect(x, top + 2 * p, p, h - 4 * p);
+  g.fillStyle = accent;
+  if (style === 'stripes') {
+    for (let x = left + 3 * p; x < left + w - 3 * p; x += 4 * p) g.fillRect(x, top + 2 * p, p, h - 4 * p);
+  } else if (style === 'frame') {
+    g.fillRect(left + 3 * p, top + 3 * p, w - 6 * p, h - 6 * p);
+    g.fillStyle = fill;
+    g.fillRect(left + 4 * p, top + 4 * p, w - 8 * p, h - 8 * p);
+  } else if (style === 'checker') {
+    const cell = 3 * p;
+    for (let y = top + 2 * p, j = 0; y + cell <= top + h - 2 * p; y += cell, j++) {
+      for (let x = left + 2 * p, i = 0; x + cell <= left + w - 2 * p; x += cell, i++) {
+        if ((i + j) % 2) g.fillRect(x, y, cell, cell);
+      }
+    }
+  } else if (style === 'diamonds') {
+    for (let x = left + 4 * p; x <= left + w - 5 * p; x += 5 * p) {
+      for (let y = top + 3 * p; y <= top + h - 6 * p; y += 5 * p) {
+        g.fillRect(x + p, y, p, p);
+        g.fillRect(x, y + p, 3 * p, p);
+        g.fillRect(x + p, y + 2 * p, p, p);
+      }
+    }
+  }
 }
 
 function paintNameplate(g, name, cx, top) {
@@ -267,7 +361,6 @@ const SOFA = sprite([
   'NNNNNNNNNNNNNNNNNNNNNNNN',
   '.HH..................HH.',
 ]);
-const SOFA_SEAT = 7; // row where a sitting Clawd's feet rest
 
 const ARMCHAIR = sprite([
   '..NNNNNNN..',
@@ -279,7 +372,6 @@ const ARMCHAIR = sprite([
   'NNNNNNNNNNN',
   '.H.......H.',
 ]);
-const ARMCHAIR_SEAT = 6;
 
 const LAMP = sprite([
   '.YYYY.',
@@ -388,6 +480,256 @@ const BOARD_STAND = sprite([
   '..GGG..............GGG..',
 ]);
 
+
+// ------------------------------------------------- bookcase and board models
+
+const SHELF_BINDERS = sprite([
+  'DDDDDDDDDDDDDDDD',
+  'DNNNNIIIIGGGGOOD',
+  'DNNNNIIIIGGGGOOD',
+  'DNNNNIIIIGGGGOOD',
+  'DDDDDDDDDDDDDDDD',
+  'DTTTTUUUOOOMMMMD',
+  'DTTTTUUUOOOMMMMD',
+  'DTTTTUUUOOOMMMMD',
+  'DDDDDDDDDDDDDDDD',
+  'DOOAAAAOOOOOOOOD',
+  'DOOAAAAOOGGGGOOD',
+  'DOOAAAAOOGGGGOOD',
+  'DDDDDDDDDDDDDDDD',
+  'DD............DD',
+]);
+
+const SHELF_DECO = sprite([
+  'DDDDDDDDDDDDDDDD',
+  'DRRBOOOOOOPQOOOD',
+  'DRRBOOOOOPQPQOOD',
+  'DRRBOOOOOOHHOOOD',
+  'DDDDDDDDDDDDDDDD',
+  'DOOXXOOOYNNGBBOD',
+  'DOOXXOOOYNNGBBOD',
+  'DOXXXXOOYNNGBBOD',
+  'DDDDDDDDDDDDDDDD',
+  'DFFJJMMOOOOOOOOD',
+  'DFFJJMMOOOWWOOOD',
+  'DFFJJMMOOOWWOOOD',
+  'DDDDDDDDDDDDDDDD',
+  'DD............DD',
+]);
+
+const SHELVES = [SHELF, SHELF, SHELF_BINDERS, SHELF_DECO];
+// Bookcase finishes: the frame (D) and back panel (O) in wood, white or dark.
+const FINISHES = { wood: {}, white: { D: 'A', O: 'W' }, dark: { D: 'K', O: 'G' } };
+
+// Whiteboard faces, shared by the wall and the rolling versions.
+const BOARD_FACES = [
+  [
+    'GGGGGGGGGGGGGGGGGGGGGGGG',
+    'GWWWWWWWWWWWWWWWWWWWWWWG',
+    'GWBBBWWWWRRWWWWWWWWWWWWG',
+    'GWWWBWWWRWWRWWWBBBBBWWWG',
+    'GWWBWWWWWRRWWWWWWWWWWWWG',
+    'GWBBBBWWWWWWWBBWWWWWWWWG',
+    'GWWWWWWWWWWWBWWBWWNNNWWG',
+    'GWWNNNNNNWWWWBBWWWWWWWWG',
+    'GWWWWWWWWWWWWWWWWWWWWWWG',
+    'GGGGGGGGGGGGGGGGGGGGGGGG',
+  ],
+  [ // kanban, with sticky notes
+    'GGGGGGGGGGGGGGGGGGGGGGGG',
+    'GWWWWWWWWWWWWWWWWWWWWWWG',
+    'GWKKKKWWWKKKKWWWKKKKWWWG',
+    'GWWWWWWWAWWWWWWAWWWWWWWG',
+    'GWYYWWWWAXXWWWWAFFWWWWWG',
+    'GWYYWYYWAXXWWWWAFFWFFWWG',
+    'GWWWWYYWAWWWXXWAWWWFFWWG',
+    'GWYYWWWWAWWWXXWAWWWWWWWG',
+    'GWYYWWWWAWWWWWWAWWWWWWWG',
+    'GGGGGGGGGGGGGGGGGGGGGGGG',
+  ],
+  [ // bar chart and a trend line
+    'GGGGGGGGGGGGGGGGGGGGGGGG',
+    'GWWWWWWWWWWWWWWWWWWWWWWG',
+    'GWKWWWWWWWWWWWWWWWRWWWWG',
+    'GWKWWWWWWWWWWWWWRRWRWWWG',
+    'GWKWWWWBWWWWWRRWWWWWRWWG',
+    'GWKWWBWBWWBWRWWWWWWWWWWG',
+    'GWKWWBWBWWBWBWWWWWWWWWWG',
+    'GWKBWBWBWWBWBWBWWWWWWWWG',
+    'GWKKKKKKKKKKKKKKWWWWWWWG',
+    'GGGGGGGGGGGGGGGGGGGGGGGG',
+  ],
+  [ // cork board, pinned notes
+    'DDDDDDDDDDDDDDDDDDDDDDDD',
+    'DOOOOOOOOOOOOOOOOOOOOOOD',
+    'DOWWWOOORYYOOOOWWWWOOOOD',
+    'DOWWWOOOOYYOOOOWWWWOXXOD',
+    'DOWWWOROOOOOFFOWWWWOXXOD',
+    'DOOOOOWWWWOOFFOOOOOOOOOD',
+    'DORYYOWWWWOOOOOOBWWWOOOD',
+    'DOOYYOWWWWOOOOOOWWWWOOOD',
+    'DOOOOOOOOOOOOOOOOOOOOOOD',
+    'DDDDDDDDDDDDDDDDDDDDDDDD',
+  ],
+];
+const BOARDS = BOARD_FACES.map((face, i) => sprite([...face, i === 3 ? '.'.repeat(24) : '..GGGGGGGGGGGGGGGGGGGG..']));
+const BOARD_STANDS = BOARD_FACES.map((face) => sprite([
+  ...face,
+  '...G................G...',
+  '...G................G...',
+  '...G................G...',
+  '..GGG..............GGG..',
+]));
+
+
+// ------------------------------------------------------------- more models
+
+const CACTUS = sprite([
+  '...PQ...',
+  '...PQ.P.',
+  '.P.PQ.PQ',
+  '.PQPQ.PQ',
+  '.PQPQPPQ',
+  '..QPQQ..',
+  '...PQ...',
+  '...PQ...',
+  '.HHHHHH.',
+  '.HHHHHH.',
+  '..HHHH..',
+]);
+
+const SNAKE_PLANT = sprite([
+  '.Y....Y.',
+  '.PY..YP.',
+  '.PP.YPP.',
+  'YPP.PPPY',
+  'PPQ.PQPP',
+  'PQQPPQQP',
+  'PQPPQQPP',
+  '.QPQPQP.',
+  '.HHHHHH.',
+  '.HHHHHH.',
+  '..HHHH..',
+]);
+
+const FLOWERS = sprite([
+  '..R...Y.',
+  '.RYR.YRY',
+  '..R.P.Y.',
+  '.P.PPP..',
+  'PPQPQPP.',
+  '.QPPQP..',
+  '..HHHH..',
+  '..HHHH..',
+  '...HH...',
+]);
+
+const PALM = sprite([
+  'P.......Q.',
+  '.PP...QQ..',
+  '..PPQQP...',
+  'PPPQPQPPPQ',
+  '..QPPPQ...',
+  '.Q..P..PP.',
+  'Q...D....Q',
+  '....D.....',
+  '....D.....',
+  '....D.....',
+  '...DD.....',
+  '....D.....',
+  '....D.....',
+  '...HHHH...',
+  '..HHHHHH..',
+  '..HHHHHH..',
+  '...HHHH...',
+]);
+
+const MONSTERA = sprite([
+  '...PP..QQ...',
+  '..PPPP.QQQ..',
+  '.PP.PPQQ.QQ.',
+  '.PPPP..QQQQ.',
+  'PP.PPPQQ.QQQ',
+  '.PPP.QQQQQ..',
+  '..PPQQP.PP..',
+  '.QQ.PQ.PPPP.',
+  'QQQQ.Q.P.PP.',
+  '.QQ..Q..PP..',
+  '.....Q......',
+  '....HHHH....',
+  '...HHHHHH...',
+  '...HHHHHH...',
+  '....HHHH....',
+]);
+
+const ARMCHAIR_ROUND = sprite([
+  '...NNNNN...',
+  '.NNBBBBBNN.',
+  'NBBBBBBBBBN',
+  'NBNNNNNNNBN',
+  'NBBBBBBBBBN',
+  '.NBBBBBBBN.',
+  '..NNNNNNN..',
+  '...H...H...',
+]);
+
+const WINGBACK = sprite([
+  '.NNNNNNNNN.',
+  'NNBBBBBBBNN',
+  'NNBBBBBBBNN',
+  'NNBBBBBBBNN',
+  'NNNNNNNNNNN',
+  'NBNBBBBBNBN',
+  'NBNBBBBBNBN',
+  'NNNNNNNNNNN',
+  '.D.......D.',
+  '.D.......D.',
+]);
+
+const ARMCHAIR_WOOD = sprite([
+  '..BBBBBBBB..',
+  '..BBBBBBBB..',
+  '..BBBBBBBB..',
+  'DDDDDDDDDDDD',
+  'DBBBBBBBBBBD',
+  'DDDDDDDDDDDD',
+  '.D........D.',
+  'D..........D',
+]);
+
+const SOFA_WOOD = sprite([
+  '..NNNNNNNNNNNNNNNNNNNN..',
+  '..NBBBBBBBBBNBBBBBBBBN..',
+  '..NBBBBBBBBBNBBBBBBBBN..',
+  'DDDDDDDDDDDDDDDDDDDDDDDD',
+  'DBBBBBBBBBBBBBBBBBBBBBBD',
+  'DDDDDDDDDDDDDDDDDDDDDDDD',
+  '.D....................D.',
+  'D......................D',
+]);
+
+// Row where a sitting Clawd's feet rest, per seat model.
+SOFA.seat = 7;
+SOFA_WOOD.seat = 5;
+ARMCHAIR.seat = 6;
+ARMCHAIR_ROUND.seat = 5;
+WINGBACK.seat = 7;
+ARMCHAIR_WOOD.seat = 5;
+
+const PLANTS = [PLANT, PLANT, CACTUS, SNAKE_PLANT, FLOWERS];
+const TALL_PLANTS = [PLANT_TALL, PALM, MONSTERA];
+const ARMCHAIRS = [ARMCHAIR, ARMCHAIR_ROUND, WINGBACK, ARMCHAIR_WOOD];
+const SOFAS = [SOFA, SOFA_WOOD];
+
+const FABRICS = {
+  denim: { B: 'I', N: 'N' },
+  terracotta: { B: 'T', N: 'U' },
+  mustard: { B: 'M', N: 'V' },
+  sage: { B: 'F', N: 'J' },
+  rose: { B: 'X', N: 'Z' },
+  gray: { B: 'A', N: 'G' },
+};
+
 function mirror(s) {
   return { ...s, cells: s.cells.map(([x, y, c]) => [s.w - 1 - x, y, c]) };
 }
@@ -397,8 +739,30 @@ const SIDE_DESK_LEFT = mirror(SIDE_DESK);
 function recolor(s, map) {
   return { ...s, cells: s.cells.map(([x, y, c]) => [x, y, map[c] ?? c]) };
 }
-const FABRICS = [{}, { B: 'R', N: 'D' }, { B: 'Y', N: 'H' }, { B: 'P', N: 'Q' }];
-const BEANBAGS = [BEANBAG, recolor(BEANBAG, { B: 'R', N: 'D' }), recolor(BEANBAG, { B: 'Y', N: 'H' }), recolor(BEANBAG, { B: 'P', N: 'Q' })];
+// Picks models and colours for one room, always within its ambiance.
+function dressing(theme, random) {
+  const pickOne = (list) => list[Math.floor(random() * list.length)];
+  const pot = (model) => recolor(model, { H: pickOne(theme.pots) });
+  const upholster = (model) => {
+    const out = recolor(model, FABRICS[pickOne(theme.fabrics)]);
+    out.seat = model.seat;
+    return out;
+  };
+  // One finish per room, so its bookcases match.
+  const finish = FINISHES[pickOne(theme.finishes)];
+  return {
+    shelf: () => recolor(pickOne(SHELVES), finish),
+    lowShelf: (withPlant) => recolor(withPlant ? LOW_SHELF_PLANT : LOW_SHELF, finish),
+    board: () => pickOne(BOARDS),
+    boardStand: () => pickOne(BOARD_STANDS),
+    plant: () => pot(pickOne(PLANTS)),
+    tallPlant: () => pot(pickOne(TALL_PLANTS)),
+    armchair: () => upholster(pickOne(ARMCHAIRS)),
+    sofa: () => upholster(pickOne(SOFAS)),
+    beanbag: () => upholster(BEANBAG),
+    rug: () => ({ colors: RUG_COLORS[pickOne(theme.rugs)], style: pickOne(RUG_STYLES) }),
+  };
+}
 
 // Seeded generator (mulberry32): a session keeps the same layout across rebuilds.
 function seeded(text) {
@@ -428,8 +792,10 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
   const int = (a, b) => Math.floor(between(a, b + 1));
   const chance = (q) => random() < q;
   const pickOne = (list) => list[Math.floor(random() * list.length)];
+  const theme = pickOne(THEMES);
+  const look = dressing(theme, random);
 
-  paintArea(g, x0, top, W, bottom - top, wallH, u);
+  paintArea(g, x0, top, W, bottom - top, wallH, u, theme);
   paintNameplate(g, name, (x0 + x1) / 2, top - 14); // on the wall above the room, like a door sign
 
   const stations = Object.fromEntries(STATIONS.map((type) => [type, []]));
@@ -469,18 +835,19 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
   const inFront = backBase + u(36);
   let cursor = x0 + u(24);
   if (chance(0.7)) {
-    standing(PLANT, cursor, backBase);
-    cursor += PLANT.w * p + u(12);
+    const plant = look.plant();
+    standing(plant, cursor, backBase);
+    cursor += plant.w * p + u(12);
   }
   const shelfCount = int(1, W >= u(760) ? 3 : W >= u(560) ? 2 : 1);
   for (let i = 0; i < shelfCount; i++) {
-    standing(SHELF, cursor, backBase);
+    standing(look.shelf(), cursor, backBase);
     slot('shelf', cursor + u(40), inFront);
     cursor += SHELF.w * p + u(int(6, 16));
   }
   if (shelfCount === 1) slot('shelf', cursor + u(50), inFront);
   const boardLeft = cursor + u(between(30, 90));
-  drawSprite(g, BOARD, boardLeft, wall - u(18) - BOARD.h * p, p);
+  drawSprite(g, look.board(), boardLeft, wall - u(18) - BOARD.h * p, p);
   slot('board', boardLeft + u(30), wall + u(44));
   slot('board', boardLeft + u(120), wall + u(44));
 
@@ -494,8 +861,9 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
     slot('coffee', right + u(20), inFront);
   }
   if (chance(0.5)) {
-    right -= u(16) + PLANT.w * p;
-    standing(PLANT, right, backBase);
+    const plant = look.plant();
+    right -= u(16) + plant.w * p;
+    standing(plant, right, backBase);
   }
   slot('coffee', right - u(70), inFront);
   if (chance(0.85)) clocks.push({ x: right - u(between(30, 80)), y: top + Math.round(wallH * between(0.4, 0.55)) });
@@ -561,10 +929,10 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
     }
     // The row and whatever stands at its ends.
     reserve(start - u(100), deskTop - u(50), rowWidth + u(200), rowBase - deskTop + u(60));
-    if (start - x0 >= u(90) && chance(0.7)) standing(pickOne([CABINET, CABINET, PLANT]), start - u(24) - CABINET.w * p, rowBase);
+    if (start - x0 >= u(90) && chance(0.7)) standing(pickOne([CABINET, CABINET, look.plant()]), start - u(24) - CABINET.w * p, rowBase);
     if (x1 - (start + rowWidth) >= u(90)) {
       if (r === printerRow) standing(PRINTER, start + rowWidth + u(24), rowBase);
-      else if (chance(0.6)) standing(pickOne([PLANT, CABINET]), start + rowWidth + u(24), rowBase);
+      else if (chance(0.6)) standing(pickOne([look.plant(), CABINET]), start + rowWidth + u(24), rowBase);
     }
   }
 
@@ -599,7 +967,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
     const rugH = int(14, 18) * p;
     const rugX = sx0 + sectionW * between(0.55, 0.68);
     const rugY = floorBottom - u(105) + u(between(-10, 10));
-    paintRug(g, rugX, rugY, rugW, rugH, pickOne(RUGS), p);
+    paintRug(g, rugX, rugY, rugW, rugH, look.rug(), p);
     for (const dx of [-rugW / 3, 0, rugW / 3]) slot('rug', rugX + dx, rugY + u(10));
     reserve(rugX - rugW / 2 - u(20), rugY - rugH / 2 - u(60), rugW + u(40), rugH + u(70));
 
@@ -608,7 +976,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
     const bags = int(1, 3);
     for (let b = 0; b < bags; b++) {
       const left = sx0 + u(28) + b * (BEANBAG.w * p + u(int(14, 30)));
-      standing(pickOne(BEANBAGS), left, bagBase);
+      standing(look.beanbag(), left, bagBase);
       slot('beanbag', left + u(35), bagBase - 2 * p);
       reserve(left - u(10), bagBase - u(80), BEANBAG.w * p + u(20), u(80));
     }
@@ -618,7 +986,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
   for (let i = 0; i < fronts; i++) slot('front', x0 + W * 0.25 + i * u(110), floorBottom - u(2));
   reserve(x0 + W * 0.22, floorBottom - u(110), fronts * u(110) + W * 0.06, u(110));
 
-  for (let i = int(2, 5) * sections; i > 0; i--) scatter(PLANT, wall + u(80), floorBottom - u(4));
+  for (let i = int(2, 5) * sections; i > 0; i--) scatter(look.plant(), wall + u(80), floorBottom - u(4));
   if (chance(0.5)) scatter(CABINET, wall + floor * 0.5, floorBottom - u(4));
 
   return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations };
@@ -634,12 +1002,15 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   const wallH = u(110);
   const wall = top + wallH;
   const floorBottom = bottom - Math.max(20, u(28));
-  const random = seeded('shared-office');
+  // Redecorated once a day.
+  const random = seeded(`shared-office ${new Date().toDateString()}`);
   const between = (a, b) => a + random() * (b - a);
   const int = (a, b) => Math.floor(between(a, b + 1));
   const pickOne = (list) => list[Math.floor(random() * list.length)];
+  const theme = pickOne(THEMES);
+  const look = dressing(theme, random);
 
-  paintArea(g, x0, top, W, bottom - top, wallH, u);
+  paintArea(g, x0, top, W, bottom - top, wallH, u, theme);
 
   const stations = Object.fromEntries(STATIONS.map((type) => [type, []]));
   const slot = (type, x, y, perScale = 0, { dxPerScale = 0, dir = 1, anims } = {}) => stations[type].push({
@@ -655,9 +1026,16 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   };
   const standing = (s, left, base) => prop(s, left, base - s.h * p);
   const centered = (s, cx, base) => standing(s, cx - (s.w * p) / 2, base);
-  const fabric = pickOne(FABRICS);
-  const sofa = recolor(SOFA, fabric);
-  const armchair = recolor(ARMCHAIR, fabric);
+  // One model per corner, so pairs of seats match.
+  const sofa = look.sofa();
+  const armchair = look.armchair();
+  const readingChair = look.armchair();
+  const cafeChair = look.armchair();
+  // Seats are drawn behind who sits in them.
+  const seat = (chair, cx, top, type) => {
+    prop(chair, cx - (chair.w * p) / 2, top, top + 2 * p);
+    slot(type, cx, top + chair.seat * p);
+  };
 
   const leftW = Math.round(clamp(W * 0.22, u(300), u(460)));
   const rightW = Math.round(clamp(W * 0.27, u(360), u(540)));
@@ -670,39 +1048,36 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   const inFront = backBase + u(36);
 
   // ---- Left: library along the wall, meeting corner, reading corner.
-  standing(PLANT_TALL, x0 + u(16), backBase);
-  const shelfStart = x0 + u(16) + PLANT_TALL.w * p + u(10);
+  const cornerPlant = look.tallPlant();
+  standing(cornerPlant, x0 + u(16), backBase);
+  const shelfStart = x0 + u(16) + cornerPlant.w * p + u(10);
   const shelves = clamp(Math.floor((lx1 - u(30) - shelfStart) / (SHELF.w * p + u(4))), 1, 4);
   for (let i = 0; i < shelves; i++) {
     const left = shelfStart + i * (SHELF.w * p + u(4));
-    standing(SHELF, left, backBase);
+    standing(look.shelf(), left, backBase);
     slot('shelf', left + u(40), inFront);
   }
 
   const leftMid = (x0 + lx1) / 2;
   const tableBase = floorTop + u(170);
-  paintRug(g, leftMid, tableBase - u(18), u(200), u(85), RUGS[1], p);
+  paintRug(g, leftMid, tableBase - u(18), u(200), u(85), look.rug(), p);
   centered(TABLE, leftMid, tableBase);
   slot('board', leftMid, tableBase - TABLE.h * p + u(12));
   slot('board', leftMid - u(95), tableBase - u(6));
   slot('board', leftMid + u(95), tableBase - u(6));
   const boardBase = tableBase + u(110);
-  centered(BOARD_STAND, leftMid, boardBase);
+  centered(look.boardStand(), leftMid, boardBase);
   slot('board', leftMid - u(40), boardBase + u(30));
   slot('board', leftMid + u(40), boardBase + u(30));
 
   const copyBase = floorEnd - u(10);
   const readBase = Math.min(Math.max(boardBase + u(190), (boardBase + copyBase) / 2 + u(20)), floorEnd);
-  paintRug(g, x0 + u(150), readBase - u(14), u(270), u(70), RUGS[2], p);
-  standing(LOW_SHELF_PLANT, x0 + u(20), readBase);
+  paintRug(g, x0 + u(150), readBase - u(14), u(270), u(70), look.rug(), p);
+  standing(look.lowShelf(true), x0 + u(20), readBase);
   slot('shelf', x0 + u(60), readBase + u(34));
-  prop(armchair, x0 + u(130), readBase - ARMCHAIR.h * p, readBase - ARMCHAIR.h * p + 2 * p);
-  slot('beanbag', x0 + u(130) + (ARMCHAIR.w * p) / 2, readBase - ARMCHAIR.h * p + ARMCHAIR_SEAT * p);
+  seat(readingChair, x0 + u(158), readBase - readingChair.h * p, 'beanbag');
   standing(LAMP, x0 + u(195), readBase);
-  if (lx1 - x0 >= u(360)) {
-    prop(armchair, x0 + u(235), readBase - ARMCHAIR.h * p, readBase - ARMCHAIR.h * p + 2 * p);
-    slot('beanbag', x0 + u(235) + (ARMCHAIR.w * p) / 2, readBase - ARMCHAIR.h * p + ARMCHAIR_SEAT * p);
-  }
+  if (lx1 - x0 >= u(360)) seat(readingChair, x0 + u(263), readBase - readingChair.h * p, 'beanbag');
 
   // Copy corner, low on the left: printer between filing cabinets.
   if (copyBase - readBase >= u(150)) {
@@ -714,7 +1089,7 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
 
   // Divider between the library and the desks: low bookcases, spaced like a hedge.
   for (let y = floorTop + u(110); y <= floorEnd; y += u(170)) {
-    standing(LOW_SHELF_PLANT, lx1 - (LOW_SHELF.w * p) / 2, y);
+    standing(look.lowShelf(true), lx1 - (LOW_SHELF.w * p) / 2, y);
   }
 
   // ---- Right: kitchen along the wall, lounge in the middle of the zone.
@@ -727,38 +1102,38 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   kitchen -= u(12) + COOLER.w * p;
   standing(COOLER, kitchen, backBase);
   slot('coffee', kitchen + u(20), inFront);
-  kitchen -= u(16) + PLANT.w * p;
-  standing(PLANT, kitchen, backBase);
+  const kitchenPlant = look.plant();
+  kitchen -= u(16) + kitchenPlant.w * p;
+  standing(kitchenPlant, kitchen, backBase);
   drawSprite(g, PAINTING, kitchen - u(30) - PAINTING.w * p, wall - u(90), p);
 
   const loungeX = (rx0 + x1) / 2;
   const rugW = Math.min(rightW - u(100), u(300));
   const rugH = u(90);
   const rugY = floorTop + (floorEnd - floorTop) * 0.55;
-  paintRug(g, loungeX, rugY, rugW, rugH, pickOne([RUGS[0], RUGS[2]]), p);
+  paintRug(g, loungeX, rugY, rugW, rugH, look.rug(), p);
   for (const dx of [-rugW / 3, 0, rugW / 3]) slot('rug', loungeX + dx, rugY + u(10));
 
-  const sofaTop = rugY - rugH / 2 - SOFA.h * p + u(10);
-  prop(sofa, loungeX - (SOFA.w * p) / 2, sofaTop, sofaTop + 2 * p);
-  for (const dx of [-u(30), u(30)]) slot('beanbag', loungeX + dx, sofaTop + SOFA_SEAT * p);
-  standing(LAMP, loungeX - (SOFA.w * p) / 2 - u(40), sofaTop + SOFA.h * p);
-  const radioLeft = loungeX + (SOFA.w * p) / 2 + u(14);
-  standing(RADIO, radioLeft, sofaTop + SOFA.h * p);
-  slot('radio', radioLeft + RADIO.w * p + u(40), sofaTop + SOFA.h * p - u(4));
-  slot('radio', radioLeft + u(30), sofaTop + SOFA.h * p + u(40));
+  const sofaTop = rugY - rugH / 2 - sofa.h * p + u(10);
+  const sofaBase = sofaTop + sofa.h * p;
+  prop(sofa, loungeX - (sofa.w * p) / 2, sofaTop, sofaTop + 2 * p);
+  for (const dx of [-u(30), u(30)]) slot('beanbag', loungeX + dx, sofaTop + sofa.seat * p);
+  standing(LAMP, loungeX - (sofa.w * p) / 2 - u(40), sofaBase);
+  const radioLeft = loungeX + (sofa.w * p) / 2 + u(14);
+  standing(RADIO, radioLeft, sofaBase);
+  slot('radio', radioLeft + RADIO.w * p + u(40), sofaBase - u(4));
+  slot('radio', radioLeft + u(30), sofaBase + u(40));
 
   for (const side of [-1, 1]) {
     const cx = loungeX + side * (rugW / 2 + u(40));
-    if (cx - (ARMCHAIR.w * p) / 2 < rx0 + u(30) || cx + (ARMCHAIR.w * p) / 2 > x1 - u(10)) continue;
-    const armTop = rugY - (ARMCHAIR.h * p) / 2;
-    prop(armchair, cx - (ARMCHAIR.w * p) / 2, armTop, armTop + 2 * p);
-    slot('beanbag', cx, armTop + ARMCHAIR_SEAT * p);
+    if (cx - (armchair.w * p) / 2 < rx0 + u(30) || cx + (armchair.w * p) / 2 > x1 - u(10)) continue;
+    seat(armchair, cx, rugY - (armchair.h * p) / 2, 'beanbag');
   }
   const bags = int(2, 3);
   for (let i = 0; i < bags; i++) {
     const cx = loungeX + (i - (bags - 1) / 2) * u(90);
     const base = rugY + rugH / 2 + u(70);
-    centered(pickOne(BEANBAGS), cx, base);
+    centered(look.beanbag(), cx, base);
     slot('beanbag', cx, base - 2 * p);
   }
 
@@ -768,15 +1143,15 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
     centered(TABLE, loungeX, cafeBase);
     for (const side of [-1, 1]) {
       const cx = loungeX + side * u(100);
-      const armTop = cafeBase - ARMCHAIR.h * p + u(4);
-      prop(armchair, cx - (ARMCHAIR.w * p) / 2, armTop, armTop + 2 * p);
-      slot('coffee', cx, armTop + ARMCHAIR_SEAT * p);
+      seat(cafeChair, cx, cafeBase - cafeChair.h * p + u(4), 'coffee');
     }
-    standing(PLANT_TALL, x1 - u(20) - PLANT_TALL.w * p, cafeBase);
+    const cafePlant = look.tallPlant();
+    standing(cafePlant, x1 - u(20) - cafePlant.w * p, cafeBase);
   }
 
   // Green divider between the desks and the lounge.
-  for (let y = floorTop + u(120); y <= floorEnd; y += u(150)) standing(PLANT_TALL, rx0 - u(25), y);
+  const hedge = look.tallPlant(); // a hedge keeps a single model
+  for (let y = floorTop + u(120); y <= floorEnd; y += u(150)) standing(hedge, rx0 - hedge.w * p / 2, y);
 
   // ---- Middle: islands of 4 or 6 desks, in a grid with aisles.
   const cx0 = lx1 + u(60);
@@ -792,6 +1167,7 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   const gx0 = cx0 + (cw - gridW) / 2;
   const colX = (c) => gx0 + c * (islandW + aisle) + (split && c >= Math.ceil(cols / 2) ? extra : 0);
 
+  const footPlant = look.plant();
   const ch = floorEnd - floorTop - u(40);
   const height = (pairs) => (pairs - 1) * pitch + SIDE_DESK.h * p;
   const rowsPlan = [];
@@ -823,10 +1199,10 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
       // row, or a plant or a bin after the last one.
       const foot = y + height(pairs) + u(55);
       if (pairs !== rowsPlan.at(-1) || y !== lastRowY) {
-        standing(LOW_SHELF_PLANT, rightDesk - LOW_SHELF.w * p, foot);
-        standing(LOW_SHELF, rightDesk, foot);
+        standing(look.lowShelf(true), rightDesk - LOW_SHELF.w * p, foot);
+        standing(look.lowShelf(false), rightDesk, foot);
       } else {
-        const end = pickOne([PLANT, PLANT, BIN, null]);
+        const end = pickOne([footPlant, footPlant, BIN, null]);
         if (end) centered(end, rightDesk, foot);
       }
     }
@@ -835,7 +1211,8 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   if (split) {
     // Wider central aisle, lined with plants.
     const sx = colX(Math.ceil(cols / 2)) - aisle / 2 - extra / 2;
-    for (let py = floorTop + u(140); py <= floorEnd; py += u(220)) centered(PLANT, sx, py);
+    const aislePlant = look.plant();
+    for (let py = floorTop + u(140); py <= floorEnd; py += u(220)) centered(aislePlant, sx, py);
   }
 
   // ---- Wall over the plateau: windows in a regular rhythm, the clock in the middle.
@@ -852,8 +1229,9 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   if (middle < 0) clocks.push({ x: wallFrom + span / 2, y: top + Math.round(wallH * 0.45) });
 
   // ---- Front walkway, framed by two tall plants.
-  standing(PLANT_TALL, x0 + u(16), floorBottom - u(4));
-  standing(PLANT_TALL, x1 - u(16) - PLANT_TALL.w * p, floorBottom - u(4));
+  const entrance = look.tallPlant(); // the same model on both sides
+  standing(entrance, x0 + u(16), floorBottom - u(4));
+  standing(entrance, x1 - u(16) - entrance.w * p, floorBottom - u(4));
   const fronts = clamp(Math.floor(cw / u(110)), 3, 12);
   for (let i = 0; i < fronts; i++) slot('front', cx0 + (cw * (i + 0.5)) / fronts, floorBottom - u(2));
 
