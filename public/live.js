@@ -1,6 +1,7 @@
 import { ANIMS, BALL, FRAME_H, FRAME_W, PASS } from './sprites.js';
 import { PALETTES, cycleDone, drawFrame, fitCanvas, frameIndex } from './render.js';
 import { DECORS, DEFAULT_SETTINGS } from './decor.js';
+import { drawLight } from './office.js';
 
 // Subagents are drawn one pixel size smaller than their main agent.
 const scaleFor = (kind, px) => (kind === 'main' ? px : Math.max(2, px - 1));
@@ -811,7 +812,17 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
     ].sort((a, b) => a.y - b.y);
     for (const item of scene) item.draw();
     // Night falls on furniture and Clawds alike; the names stay readable.
-    const dark = (office.shade?.(ctx, date, width, height) ?? 0) > 0.5;
+    const night = office.shade?.(ctx, date, width, height) ?? 0;
+    const dark = night > 0.5;
+    // At night, working at a desk, a shelf or a whiteboard switches its light on;
+    // it goes off once nobody works there any more.
+    if (night) {
+      const lit = new Set();
+      for (const c of critters.values()) {
+        if (c.state === 'working' && !c.target && c.slot?.light) lit.add(c.slot.light);
+      }
+      for (const light of lit) drawLight(ctx, light, night);
+    }
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';

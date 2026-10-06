@@ -735,6 +735,61 @@ function mirror(s) {
 }
 const SIDE_DESK_LEFT = mirror(SIDE_DESK);
 
+// Desk lamp, switched on at night when someone works at the desk.
+const DESK_LAMP = sprite([
+  '..YYY',
+  '.YYYY',
+  '...K.',
+  '..K..',
+  '..K..',
+  '.KKK.',
+]);
+const DESK_LAMP_LEFT = mirror(DESK_LAMP);
+
+// Each desk gets for good either a lamp or the screen's backlight, picked from
+// its position so the decor's random draws stay untouched.
+const lightKind = (x, y) => ((Math.round(x) * 7 + Math.round(y) * 13) % 5 < 2 ? 'lamp' : 'screen');
+
+// Front desk: the monitor's back is on the left (rows 0-4), the mug on the right.
+function frontDeskLight(left, top, p) {
+  const kind = lightKind(left, top);
+  if (kind === 'lamp') return { kind, x: left + 22 * p, y: top + 1 * p, lamp: { s: DESK_LAMP, left: left + 21 * p, top: top + 1 * p }, p };
+  return { kind, x: left + 8 * p, y: top + 2.5 * p, p };
+}
+
+// Side desk, Clawd on the left when side is 1: the screen at the far end faces it.
+function sideDeskLight(left, top, p, side) {
+  const kind = lightKind(left, top);
+  const col = (c) => left + (side > 0 ? c : SIDE_DESK.w - 1 - c) * p;
+  if (kind === 'lamp') {
+    const lampLeft = side > 0 ? col(4) : col(8);
+    return { kind, x: col(6), y: top + 2 * p, lamp: { s: side > 0 ? DESK_LAMP : DESK_LAMP_LEFT, left: lampLeft, top: top + 1 * p }, p };
+  }
+  return { kind, x: col(8) + p / 2, y: top + 2.5 * p, p };
+}
+
+// Floor lamp standing at (left, base), switched on by whoever reads or thinks nearby.
+// Only its shade is redrawn lit, so the pole never covers a Clawd in front.
+const LAMP_SHADE = { ...LAMP, cells: LAMP.cells.filter(([, y]) => y < 3) };
+function floorLamp(left, base, p) {
+  const top = base - LAMP.h * p;
+  return { kind: 'floor', x: left + 3 * p, y: top + 1.5 * p, lamp: { s: LAMP_SHADE, left, top }, p };
+}
+
+// Glow of a work light, drawn over the night tint so it stays bright.
+export function drawLight(ctx, light, night) {
+  const { kind, x, y, lamp, p } = light;
+  const warm = kind !== 'screen';
+  const r = { lamp: 20, screen: 16, floor: 34 }[kind] * p;
+  const [cr, cg, cb] = warm ? [255, 210, 120] : [170, 210, 255];
+  const glow = ctx.createRadialGradient(x, y, 0, x, y, r);
+  glow.addColorStop(0, `rgb(${cr} ${cg} ${cb} / ${(warm ? 0.5 : 0.42) * night})`);
+  glow.addColorStop(1, `rgb(${cr} ${cg} ${cb} / 0)`);
+  ctx.fillStyle = glow;
+  ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+  if (lamp) drawSprite(ctx, lamp.s, lamp.left, lamp.top, p);
+}
+
 // Same palette keys, other colours: beanbags come in a few fabrics.
 function recolor(s, map) {
   return { ...s, cells: s.cells.map(([x, y, c]) => [x, y, map[c] ?? c]) };
@@ -801,11 +856,12 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
   const stations = Object.fromEntries(STATIONS.map((type) => [type, []]));
   // perScale and dxPerScale shift the spot with the Clawd's size, so its hands
   // land on the same furniture whether it is a main agent or a subagent.
-  const slot = (type, x, y, perScale = 0, { dxPerScale = 0, dir = 1, anims } = {}) => stations[type].push({
+  const slot = (type, x, y, perScale = 0, { dxPerScale = 0, dir = 1, anims, light } = {}) => stations[type].push({
     type,
     occupant: null,
     dir,
     anims,
+    light,
     spot: (scale) => ({ x: Math.round(x + dxPerScale * scale), y: Math.round(y + perScale * scale) }),
   });
 
@@ -845,11 +901,15 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
     slot('shelf', cursor + u(40), inFront);
     cursor += SHELF.w * p + u(int(6, 16));
   }
-  if (shelfCount === 1) slot('shelf', cursor + u(50), inFront);
   const boardLeft = cursor + u(between(30, 90));
+  // A floor lamp in the gap between the shelves and the whiteboard, for both.
+  const reading = floorLamp((cursor + boardLeft) / 2 - (LAMP.w * p) / 2, backBase, p);
+  standing(LAMP, reading.lamp.left, backBase);
+  for (let i = 0; i < shelfCount; i++) stations.shelf[stations.shelf.length - 1 - i].light = reading;
+  if (shelfCount === 1) slot('shelf', cursor + u(50), inFront, 0, { light: reading });
   drawSprite(g, look.board(), boardLeft, wall - u(18) - BOARD.h * p, p);
-  slot('board', boardLeft + u(30), wall + u(44));
-  slot('board', boardLeft + u(120), wall + u(44));
+  slot('board', boardLeft + u(30), wall + u(44), 0, { light: reading });
+  slot('board', boardLeft + u(120), wall + u(44), 0, { light: reading });
 
   // Along the wall, right: coffee machine, maybe a water cooler and a plant, the clock.
   let right = x1 - u(28) - COFFEE.w * p;
@@ -911,7 +971,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
         if (placed > 0 && chance(0.15)) continue;
         prop(DESK, left, deskTop);
         // Feet just behind the desk, so the animation's keyboard lands on the desktop.
-        slot('desk', left + 18 * p, deskTop + (DESK_SURFACE + 1) * p, 2);
+        slot('desk', left + 18 * p, deskTop + (DESK_SURFACE + 1) * p, 2, { light: frontDeskLight(left, deskTop, p) });
         placed++;
         continue;
       }
@@ -924,8 +984,8 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
       const rightDesk = leftDesk + SIDE_DESK.w * p;
       props.push({ base: sideBase, draw: (ctx) => drawSprite(ctx, SIDE_DESK, leftDesk, islandTop, p) });
       props.push({ base: sideBase, draw: (ctx) => drawSprite(ctx, SIDE_DESK_LEFT, rightDesk, islandTop, p) });
-      slot('desk', leftDesk, keys, 5, { dxPerScale: -4.5, anims: ['type-side'] });
-      slot('desk', rightDesk + SIDE_DESK.w * p, keys, 5, { dxPerScale: 3.5, dir: -1, anims: ['type-side'] });
+      slot('desk', leftDesk, keys, 5, { dxPerScale: -4.5, anims: ['type-side'], light: sideDeskLight(leftDesk, islandTop, p, 1) });
+      slot('desk', rightDesk + SIDE_DESK.w * p, keys, 5, { dxPerScale: 3.5, dir: -1, anims: ['type-side'], light: sideDeskLight(rightDesk, islandTop, p, -1) });
       rowBase = islandTop + SIDE_DESK.h * p;
     }
     // The row and whatever stands at its ends.
@@ -1014,11 +1074,12 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
   paintArea(g, x0, top, W, bottom - top, wallH, u, theme);
 
   const stations = Object.fromEntries(STATIONS.map((type) => [type, []]));
-  const slot = (type, x, y, perScale = 0, { dxPerScale = 0, dir = 1, anims } = {}) => stations[type].push({
+  const slot = (type, x, y, perScale = 0, { dxPerScale = 0, dir = 1, anims, light } = {}) => stations[type].push({
     type,
     occupant: null,
     dir,
     anims,
+    light,
     spot: (scale) => ({ x: Math.round(x + dxPerScale * scale), y: Math.round(y + perScale * scale) }),
   });
   // `sortAt` overrides the depth used for sorting (seats are drawn behind who sits in them).
@@ -1053,23 +1114,28 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
   standing(cornerPlant, x0 + u(16), backBase);
   const shelfStart = x0 + u(16) + cornerPlant.w * p + u(10);
   const shelves = clamp(Math.floor((lx1 - u(30) - shelfStart) / (SHELF.w * p + u(4))), 1, 4);
+  const library = floorLamp(shelfStart + shelves * (SHELF.w * p + u(4)) + u(4), backBase, p);
+  standing(LAMP, library.lamp.left, backBase);
   for (let i = 0; i < shelves; i++) {
     const left = shelfStart + i * (SHELF.w * p + u(4));
     standing(look.shelf(), left, backBase);
-    slot('shelf', left + u(40), inFront);
+    slot('shelf', left + u(40), inFront, 0, { light: library });
   }
 
   const leftMid = (x0 + lx1) / 2;
   const tableBase = floorTop + u(170);
   paintRug(g, leftMid, tableBase - u(18), u(200), u(85), look.rug(), p);
   centered(TABLE, leftMid, tableBase);
-  slot('board', leftMid, tableBase - TABLE.h * p + u(12));
-  slot('board', leftMid - u(95), tableBase - u(6));
-  slot('board', leftMid + u(95), tableBase - u(6));
   const boardBase = tableBase + u(110);
-  centered(look.boardStand(), leftMid, boardBase);
-  slot('board', leftMid - u(40), boardBase + u(30));
-  slot('board', leftMid + u(40), boardBase + u(30));
+  const stand = look.boardStand();
+  const thinking = floorLamp(leftMid + (stand.w * p) / 2 + u(14), boardBase, p);
+  slot('board', leftMid, tableBase - TABLE.h * p + u(12), 0, { light: thinking });
+  slot('board', leftMid - u(95), tableBase - u(6), 0, { light: thinking });
+  slot('board', leftMid + u(95), tableBase - u(6), 0, { light: thinking });
+  centered(stand, leftMid, boardBase);
+  standing(LAMP, thinking.lamp.left, boardBase);
+  slot('board', leftMid - u(40), boardBase + u(30), 0, { light: thinking });
+  slot('board', leftMid + u(40), boardBase + u(30), 0, { light: thinking });
 
   const copyBase = floorEnd - u(10);
   const readBase = Math.min(Math.max(boardBase + u(190), (boardBase + copyBase) / 2 + u(20)), floorEnd);
@@ -1197,8 +1263,8 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
         const keys = deskTop + SIDE_KEYS * p;
         props.push({ base: keys + 2 * p, draw: (ctx) => drawSprite(ctx, SIDE_DESK, leftDesk, deskTop, p) });
         props.push({ base: keys + 2 * p, draw: (ctx) => drawSprite(ctx, SIDE_DESK_LEFT, rightDesk, deskTop, p) });
-        slot('desk', leftDesk, keys, 5, { dxPerScale: -4.5, anims: ['type-side'] });
-        slot('desk', rightDesk + SIDE_DESK.w * p, keys, 5, { dxPerScale: 3.5, dir: -1, anims: ['type-side'] });
+        slot('desk', leftDesk, keys, 5, { dxPerScale: -4.5, anims: ['type-side'], light: sideDeskLight(leftDesk, deskTop, p, 1) });
+        slot('desk', rightDesk + SIDE_DESK.w * p, keys, 5, { dxPerScale: 3.5, dir: -1, anims: ['type-side'], light: sideDeskLight(rightDesk, deskTop, p, -1) });
       }
       // At the foot of each island: low bookcases separating it from the next
       // row, or a plant or a bin after the last one.

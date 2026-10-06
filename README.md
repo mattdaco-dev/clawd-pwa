@@ -34,7 +34,9 @@ porte les réglages, gardés dans le navigateur :
 - Taille des pixels : de 3 à 6 px, décor compris. Les subagents ont toujours un pixel de moins.
 
 L'open space suit l'heure locale : ciel orangé au coucher du soleil, nuit étoilée dans les fenêtres
-et lampes allumées de 21 h à 6 h. Après 20 h, les Clawd au repos s'endorment au bout de 30 s au lieu
+et lampes allumées de 21 h à 6 h. La nuit, un Clawd qui travaille allume sa lumière : lampe de bureau ou
+rétroéclairage de l'écran selon le bureau, lampe sur pied près de la bibliothèque et du tableau
+blanc. Elle s'éteint quand il s'en va. Après 20 h, les Clawd au repos s'endorment au bout de 30 s au lieu
 de 2 minutes. Pour voir la nuit en plein jour, ouvrir `/?heure=22`.
 
 Le titre de l'onglet et l'icône de la PWA installée affichent le nombre d'agents qui attendent un
