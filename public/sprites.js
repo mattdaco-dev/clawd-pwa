@@ -177,6 +177,30 @@ function magnifier(p, x, y) {
   p(x - 2, y + 6, 'H');
 }
 
+// Terrestrial globe on a stand, at the Clawd's right. The map scrolls one
+// column per frame inside the round mask, so the globe turns.
+const GLOBE_MASK = ['..XXX..', '.XXXXX.', 'XXXXXXX', 'XXXXXXX', 'XXXXXXX', '.XXXXX.', '..XXX..'];
+const WORLD = [
+  '..PP....P.....',
+  '.PPPP..PPP....',
+  '..PPP...PPPP..',
+  '...P.....PP...',
+  '....PP....P...',
+  '....PPP.......',
+  '.....P........',
+];
+
+function globe(p, t) {
+  GLOBE_MASK.forEach((row, j) => [...row].forEach((c, i) => {
+    if (c === '.') return;
+    const land = WORLD[j][(i + t) % WORLD[j].length] === 'P';
+    p(17 + i, -1 + j, land ? 'P' : 'B');
+  }));
+  for (const [x, y] of [[23, -2], [24, -1], [25, 0], [25, 1], [25, 2], [25, 3], [24, 4], [23, 5]]) p(x, y, 'H');
+  for (let y = 6; y <= 8; y++) p(20, y, 'H');
+  for (let x = 18; x <= 22; x++) p(x, 9, 'H');
+}
+
 const Z = ['KKKK', '..K.', '.K..', 'KKKK'];
 const BALL = ['.RR.', 'RWRR', 'RRRR', '.RR.'];
 const RING = [[-2, 1], [0, -3], [9, -4], [17, -3], [20, 2], [20, 8], [-2, 8], [4, -4], [14, -4]];
@@ -229,8 +253,21 @@ export const ANIMS = {
       magnifier(p, 18, [1, 0, 1, 2][i % 4]);
     }),
   },
-  web: {
-    label: 'Écoute le web',
+  globe: {
+    label: 'Regarde le globe',
+    fps: 4,
+    loop: true,
+    frames: frames(8, (f, i) => {
+      const p = clawd(f, {
+        eyes: i === 5 ? 'wide' : i === 6 ? 'up' : 'right',
+        right: i % 4 < 2 ? 'mid' : 'out',
+        legs: i === 3 ? 'tapR' : 'stand',
+      });
+      globe(p, i);
+    }),
+  },
+  music: {
+    label: 'Écoute de la musique',
     fps: 5,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -238,7 +275,7 @@ export const ANIMS = {
       headphones(p);
       stamp(p, 19 + Math.floor(i / 3), -2 - i, NOTE);
       const j = (i + 4) % 8;
-      stamp(p, 23 + Math.floor(j / 3), -2 - j, NOTE);
+      stamp(p, 21 + Math.floor(j / 3), -2 - j, NOTE);
     }),
   },
   think: {
@@ -458,7 +495,7 @@ export const GROUPS = [
       ['type-laptop', 'Quand tous les bureaux sont pris'],
       ['type-side', 'Aux bureaux de côté (le bureau fait partie du décor)'],
       ['search', 'Read, Grep, Glob'],
-      ['web', 'WebFetch, WebSearch, outils MCP'],
+      ['globe', 'WebFetch, WebSearch, outils MCP'],
       ['think', 'Prompt reçu (UserPromptSubmit), délégation à un subagent'],
     ],
   },
@@ -478,6 +515,7 @@ export const GROUPS = [
     hint: 'Après Stop. Tirage au hasard entre ces animations, sieste au bout de 2 minutes.',
     items: [
       ['walk', 'Se déplace dans sa zone'],
+      ['music', 'Pause musicale, à côté de la radio'],
       ['breathe', 'Pause entre deux activités'],
       ['look', 'Pause entre deux activités'],
       ['jump', 'Jeu'],

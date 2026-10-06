@@ -16,7 +16,7 @@ const SLEEP_AFTER = 120_000;
 const WORK = {
   type: { station: 'desk', anims: ['type-front'], loose: ['type-front', 'type-laptop'] },
   search: { station: 'shelf', anims: ['search'] },
-  web: { station: 'radio', anims: ['web'] },
+  web: { station: 'shelf', anims: ['globe'] },
   think: { station: 'board', anims: ['think'] },
 };
 const WAIT = { station: 'front', anims: ['flag', 'bubble', 'wave'] };
@@ -24,7 +24,8 @@ const SLEEP = { station: 'beanbag', anims: ['sleep'] };
 const IDLE = [
   [{ station: null, wander: true, anims: ['breathe', 'look'] }, 40],
   [{ station: 'coffee', anims: ['breathe', 'look'] }, 25],
-  [{ station: 'rug', anims: ['ball', 'dance', 'jump'] }, 35],
+  [{ station: 'rug', anims: ['ball', 'dance', 'jump'] }, 30],
+  [{ station: 'radio', anims: ['music'] }, 20],
 ];
 const CYCLES = { working: 4, waiting: 3, idle: 2 };
 

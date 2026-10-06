@@ -1150,8 +1150,10 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks }) {
   }
 
   // Green divider between the desks and the lounge.
-  const hedge = look.tallPlant(); // a hedge keeps a single model
-  for (let y = floorTop + u(120); y <= floorEnd; y += u(150)) standing(hedge, rx0 - hedge.w * p / 2, y);
+  for (let y = floorTop + u(120); y <= floorEnd; y += u(150)) {
+    const plant = look.tallPlant();
+    standing(plant, rx0 - (plant.w * p) / 2, y);
+  }
 
   // ---- Middle: islands of 4 or 6 desks, in a grid with aisles.
   const cx0 = lx1 + u(60);
