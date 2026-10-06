@@ -33,8 +33,9 @@ porte les réglages, gardés dans le navigateur :
   postes).
 - Taille des pixels : de 3 à 6 px, décor compris. Les subagents ont toujours un pixel de moins.
 
-Le hook garde une copie brute de chaque payload dans `logs/events.jsonl` (5 Mo max, `CLAWD_LOG=0`
-pour couper). Il ne bloque jamais Claude : sortie vide, code 0, envoi au serveur détaché.
+Avec `CLAWD_LOG=1`, le hook garde une copie brute de chaque payload dans `logs/events.jsonl`
+(5 Mo max). Coupé par défaut : les payloads contiennent les prompts et les entrées d'outils en
+clair. Le hook est déclaré `async`, il ne bloque jamais Claude : sortie vide, code 0.
 
 ## Organisation
 

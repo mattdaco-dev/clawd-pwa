@@ -32,7 +32,7 @@ def main():
     for event in TOOL_EVENTS + OTHER_EVENTS:
         groups = [g for g in hooks.get(event, []) if not is_ours(g)]
         if not uninstall:
-            group = {"hooks": [{"type": "command", "command": HOOK, "timeout": 5}]}
+            group = {"hooks": [{"type": "command", "command": HOOK, "timeout": 5, "async": True}]}
             if event in TOOL_EVENTS:
                 group = {"matcher": "*", **group}
             groups.append(group)
