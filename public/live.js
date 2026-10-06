@@ -36,6 +36,7 @@ const BALL_SPEED = 70; // sprite pixels per second
 const EXCHANGES = [4, 8]; // sword exchanges before one of them wins
 const DUEL_GAP = 11; // sprite pixels from the middle of the rug to each fencer
 const SPARK_MS = 220;
+const DELIVERY_MS = 8000; // longest walk to hand a report over
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -88,8 +89,40 @@ class Critter {
     this.replan = true;
   }
 
+  // A finished subagent walks up to its main agent and hands its report over
+  // before vanishing; gives up after a while if the main agent keeps moving.
+  handOver(parent, now) {
+    this.duo?.end(false);
+    this.release();
+    this.delivering = { parent, until: now + DELIVERY_MS };
+    this.locked = false;
+    this.toParent();
+  }
+
+  toParent() {
+    const { parent } = this.delivering;
+    const side = Math.sign(this.x - parent.x) || 1;
+    // Close enough for the sheet held at arm's length to reach the main agent.
+    const gap = HALF_BODY * parent.scale + 12 * this.scale;
+    this.walkTo({ x: parent.x + side * gap, y: parent.y }, this.zone);
+  }
+
+  deliver(now, dt) {
+    const { parent, until } = this.delivering;
+    if (parent.leaving || parent.dead || now > until) return this.leave();
+    if (this.target) return this.walk(dt);
+    if (this.anim !== 'handoff') {
+      // The main agent may have moved meanwhile: catch up before handing over.
+      if (Math.abs(parent.x - this.x) > (HALF_BODY + 2) * (parent.scale + this.scale) * 1.5) return this.toParent();
+      this.dir = parent.x > this.x ? 1 : -1;
+      return this.play('handoff');
+    }
+    if (this.finished(now)) this.leave();
+  }
+
   leave() {
     if (this.leaving) return;
+    this.delivering = null;
     this.leaving = true;
     this.duo?.end(false);
     this.release();
@@ -105,6 +138,7 @@ class Critter {
       if (this.finished(now)) this.dead = true;
       return;
     }
+    if (this.delivering) return this.deliver(now, dt);
     if (this.locked && !this.finished(now)) return;
     this.locked = false;
 
@@ -189,7 +223,9 @@ class Critter {
     this.x = this.target.x;
     this.y = this.target.y;
     this.target = null;
-    if (this.duo) {
+    if (this.delivering) {
+      this.play('breathe', Infinity);
+    } else if (this.duo) {
       this.dir = this.duoDir;
       this.play(this.duo.ready, Infinity);
     } else {
@@ -580,7 +616,12 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
     const alive = new Set(agents.map((a) => a.key));
     for (const [key, critter] of critters) {
       if (alive.has(key)) continue;
-      critter.leave();
+      const parent = critter.kind === 'sub' && critters.get(key.split('/')[0]);
+      if (parent && alive.has(key.split('/')[0]) && parent.zone === critter.zone && !critter.leaving) {
+        if (!critter.delivering) critter.handOver(parent, now);
+      } else {
+        critter.leave();
+      }
       critter.update(now, dt, critter, critter.zone ?? office.zones[0]);
       if (critter.dead) critters.delete(key);
     }

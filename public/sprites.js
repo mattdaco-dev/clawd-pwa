@@ -232,6 +232,7 @@ function globe(p, t) {
 
 const Z = ['KKKK', '..K.', '.K..', 'KKKK'];
 const BALL = ['.RR.', 'RWRR', 'RRRR', '.RR.'];
+const PAPER = ['LLLL', 'LWWL', 'LGGL', 'LWWL', 'LGGL', 'LLLL'];
 // Top row of the ball held by « pass-throw » at each frame, relative to Clawd;
 // null once thrown. Frame 0 is the catch, frame 2 the release.
 const PASS_BALL = [1, 2, -1, null, null];
@@ -543,6 +544,21 @@ export const ANIMS = {
       }
     }),
   },
+  // A subagent done with its task hands the report to its main agent (on the right).
+  handoff: {
+    label: 'Rend son rapport',
+    fps: 6,
+    loop: false,
+    frames: frames(8, (f, i) => {
+      const held = i < 5;
+      const p = clawd(f, {
+        eyes: i >= 3 ? 'happy' : 'right',
+        right: held ? 'mid' : i === 6 ? 'high' : 'mid',
+        legs: i === 2 ? 'tapR' : 'stand',
+      });
+      if (held) stamp(p, 18 + (i >= 2 ? 1 : 0), -2, PAPER);
+    }),
+  },
   sleep: {
     label: 'Dort',
     fps: 3,
@@ -674,6 +690,7 @@ export const GROUPS = [
     items: [
       ['arrive', 'SessionStart, SubagentStart'],
       ['celebrate', 'Stop après un travail'],
+      ['handoff', 'SubagentStop : le subagent rejoint son agent principal'],
       ['leave', 'SubagentStop, SessionEnd'],
     ],
   },
