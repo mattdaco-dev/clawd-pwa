@@ -79,6 +79,8 @@ function sessionFor(p) {
 function apply(p) {
   const event = p.hook_event_name;
   if (!p.session_id || !event) return;
+  // Internal tool a subagent calls to hand its report back: not real work.
+  if (p.tool_name === 'SubagentHandback') return;
   if (event === 'SessionEnd') {
     sessions.delete(p.session_id);
     return;
