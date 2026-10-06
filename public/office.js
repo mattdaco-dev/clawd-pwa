@@ -102,11 +102,27 @@ const COUNTER = sprite([
   'DDDDDDDDDDDDDDDDDDDDDDDD',
 ]);
 const COUNTER_MACHINE = 6; // column in front of the machine
+const COUNTER_PENDANT = 17; // column under the pendant lamp, over the mugs
+
+// Pendant lamp over the counter, hung from the top of the wall by its cord.
+const PENDANT = sprite([
+  '..KKK..',
+  '.YYYYY.',
+  'YYYYYYY',
+  '...W...',
+]);
 
 // The coffee corner: one drinks alone at the machine; two chat face to face in
 // front of the counter, which takes the machine's place along with them.
-function coffeeCorner(left, base, inFront, { p, u, standing, slot, stations }) {
+function coffeeCorner(left, base, inFront, { g, ceiling, lamps, p, u, standing, slot, stations }) {
   standing(COUNTER, left, base);
+  // The pendant lamp, lit at night like the floor lamps.
+  const cx = left + COUNTER_PENDANT * p;
+  const shadeTop = base - COUNTER.h * p - u(28);
+  g.fillStyle = INK.K;
+  g.fillRect(Math.round(cx - p / 2), ceiling, p, Math.round(shadeTop - ceiling));
+  drawSprite(g, PENDANT, cx - 3.5 * p, shadeTop, p);
+  lamps.push({ x: cx, y: base - COUNTER.h * p }); // glow centred on the worktop
   slot('coffee', left + COUNTER_MACHINE * p, inFront);
   // Centred on the machine, so the one on the right still fits by the wall's end.
   slot('chat', left + COUNTER_MACHINE * p, inFront + u(6));
@@ -929,7 +945,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, { p
 
   // Along the wall, right: coffee corner, maybe a water cooler and a plant, the clock.
   let right = x1 - u(28) - COUNTER.w * p;
-  coffeeCorner(right, backBase, inFront, { p, u, standing, slot, stations });
+  coffeeCorner(right, backBase, inFront, { g, ceiling: top, lamps, p, u, standing, slot, stations });
   if (chance(0.75)) {
     right -= u(20) + COOLER.w * p;
     standing(COOLER, right, backBase);
@@ -1196,7 +1212,7 @@ function furnishShared(g, { x0, x1, top, bottom }, { p, u, props, clocks, skies,
   standing(FRIDGE, kitchen, backBase);
   slot('coffee', kitchen + u(25), inFront + u(10));
   kitchen -= u(12) + COUNTER.w * p;
-  coffeeCorner(kitchen, backBase, inFront, { p, u, standing, slot, stations });
+  coffeeCorner(kitchen, backBase, inFront, { g, ceiling: top, lamps, p, u, standing, slot, stations });
   kitchen -= u(12) + COOLER.w * p;
   standing(COOLER, kitchen, backBase);
   slot('coffee', kitchen + u(20), inFront);
