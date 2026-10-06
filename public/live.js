@@ -37,6 +37,8 @@ const EXCHANGES = [4, 8]; // sword exchanges before one of them wins
 const DUEL_GAP = 11; // sprite pixels from the middle of the rug to each fencer
 const SPARK_MS = 220;
 const DELIVERY_MS = 8000; // longest walk to hand a report over
+const FIVE_GAP = 10; // sprite pixels from the meeting point to each hand
+const FIVE_REACH = 70; // sprite pixels: further away, they celebrate alone
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -151,6 +153,7 @@ class Critter {
       if (agent.state === 'idle') this.idleSince = now;
       if (wasWorking && agent.state === 'idle') {
         this.target = null;
+        this.justDone = now; // the scene may turn this into a high five
         return this.play('celebrate', 1, true);
       }
       return this.decide(now, zone);
@@ -267,6 +270,7 @@ class Duo {
     const spots = this.spots(slots);
     players.forEach((c, i) => {
       c.release();
+      c.locked = false;
       c.plan = null;
       c.duo = this;
       c.duoDir = i === 0 ? 1 : -1;
@@ -289,6 +293,7 @@ class Duo {
     const side = this.watchers.some((w) => w.watchSide === 1) ? -1 : 1;
     const outer = side > 0 ? this.players[1] : this.players[0];
     c.release();
+    c.locked = false;
     c.plan = null;
     c.duo = this;
     c.watching = true;
@@ -484,6 +489,38 @@ class SwordDuel extends Duo {
   }
 }
 
+// Done with its work, a Clawd meets an idle one halfway for a high five.
+class HighFive extends Duo {
+  constructor(players) {
+    super(players, []);
+    this.ready = 'breathe';
+  }
+
+  spots() {
+    const [a, b] = this.players;
+    const x = (a.x + b.x) / 2;
+    const y = (a.y + b.y) / 2;
+    return this.players.map((c, i) => ({ x: x + (i === 0 ? -1 : 1) * FIVE_GAP * c.scale, y }));
+  }
+
+  play(now) {
+    if (!this.slapping) {
+      this.slapping = true;
+      for (const c of this.players) {
+        c.dir = c.duoDir;
+        c.play('high-five');
+        c.t0 = now;
+      }
+      return;
+    }
+    if (this.players.every((c) => c.finished(now))) this.end(true);
+  }
+
+  finale(c) {
+    c.replan = true;
+  }
+}
+
 const GAMES = [BallGame, SwordDuel];
 
 // Idle Clawds free to start a game: not walking, not asleep, not already playing.
@@ -603,6 +640,21 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
     }
   }
 
+  // Whoever just finished working looks for an idle Clawd close by.
+  function highFives(now) {
+    for (const c of critters.values()) {
+      if (!c.justDone) continue;
+      const done = c;
+      c.justDone = null;
+      if (done.duo || done.leaving) continue;
+      const near = [...critters.values()].filter((o) => o !== done && o.zone === done.zone && available(o, now) &&
+        Math.hypot(o.x - done.x, o.y - done.y) < FIVE_REACH * done.scale);
+      if (!near.length) continue;
+      const other = pick(near);
+      duos.push(new HighFive(done.x <= other.x ? [done, other] : [other, done]));
+    }
+  }
+
   function pairUp(now) {
     for (const zone of office.zones) {
       if (now - (lastPairing.get(zone) ?? 0) < PAIR_EVERY) continue;
@@ -652,6 +704,7 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
 
     for (const duo of duos) duo.update(now);
     duos = duos.filter((d) => !d.over);
+    highFives(now);
     pairUp(now);
 
     const alive = new Set(agents.map((a) => a.key));

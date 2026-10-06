@@ -544,6 +544,23 @@ export const ANIMS = {
       }
     }),
   },
+  // High five with the Clawd on the right: reach, slap, hop.
+  'high-five': {
+    label: 'Tape dans la main',
+    fps: 8,
+    loop: false,
+    frames: frames(8, (f, i) => {
+      const reach = i >= 2 && i <= 4;
+      const p = clawd(f, {
+        dx: reach ? 2 : 0,
+        dy: i === 5 ? -2 : i === 6 ? -1 : 0,
+        eyes: i >= 3 ? 'happy' : 'right',
+        right: i === 0 ? 'mid' : i <= 4 ? 'high' : 'out',
+        legs: i === 5 ? 'tuck' : 'stand',
+      });
+      if (i === 3) for (const [x, y] of [[19, -5], [21, -4], [20, -6], [18, -6], [21, -2]]) p(x, y, 'Y');
+    }),
+  },
   // Watching a game from the side, facing it.
   cheer: {
     label: 'Encourage',
@@ -706,6 +723,7 @@ export const GROUPS = [
     items: [
       ['arrive', 'SessionStart, SubagentStart'],
       ['celebrate', 'Stop après un travail'],
+      ['high-five', 'Stop après un travail, avec un Clawd au repos à côté'],
       ['handoff', 'SubagentStop : le subagent rejoint son agent principal'],
       ['leave', 'SubagentStop, SessionEnd'],
     ],
