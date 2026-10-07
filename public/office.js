@@ -292,7 +292,7 @@ export function seasonOf(date) {
 function pumpkin(left, base, { p, props, glows }) {
   const top = base - PUMPKIN.h * p;
   props.push({ base: Math.round(base), draw: (ctx) => drawSprite(ctx, PUMPKIN, left, top, p) });
-  glows.push({ cells: PUMPKIN_FACE, left, top, p, x: left + 3.5 * p, y: top + 4 * p, r: 10, box: { x: left, y: top, w: PUMPKIN.w * p, h: PUMPKIN.h * p } });
+  glows.push({ cells: PUMPKIN_FACE, flame: true, left, top, p, x: left + 3.5 * p, y: top + 4 * p, r: 10, box: { x: left, y: top, w: PUMPKIN.w * p, h: PUMPKIN.h * p } });
 }
 
 function christmasTree(left, base, env, g) {
@@ -439,7 +439,7 @@ function fireplace(g, left, wall, env) {
   left = Math.round(left);
   drawSprite(g, FIREPLACE, left, top, p);
   const state = { lit: false };
-  const glow = { x: left + 9 * p, y: top + 9 * p, r: 24, isLit: () => state.lit, box: { x: left, y: top, w: FIREPLACE.w * p, h: FIREPLACE.h * p } };
+  const glow = { x: left + 9 * p, y: top + 9 * p, r: 24, flame: true, isLit: () => state.lit, box: { x: left, y: top, w: FIREPLACE.w * p, h: FIREPLACE.h * p } };
   // Flames over the logs, every column flickering at its own pace.
   const flames = (ctx, now) => {
     if (!(glow.force ?? state.lit)) return;
@@ -2195,21 +2195,35 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
       for (const g of glows) {
         const level = lightLevel(g, g.isLit ? g.isLit() : night > 0, night);
         if (!level) continue;
-        const r = u(g.r * 5);
+        // A candle or a fire breathes: the halo swells and fades, the carved
+        // face dims to orange when the flame ducks.
+        const f = g.flame ? flicker(now, g.x * 7 + g.y * 13) : 1;
+        const r = u(g.r * 5) * (g.flame ? 0.8 + 0.2 * f : 1);
         const halo = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, r);
-        halo.addColorStop(0, `rgb(255 196 90 / ${0.35 * level})`);
+        halo.addColorStop(0, `rgb(255 196 90 / ${Math.min(0.5, 0.38 * level * f)})`);
         halo.addColorStop(1, 'rgb(255 196 90 / 0)');
         ctx.fillStyle = halo;
         ctx.fillRect(g.x - r, g.y - r, 2 * r, 2 * r);
         if (g.draw) g.draw(ctx, now);
         else for (const [x, y, c] of g.cells) {
-          ctx.fillStyle = INK[c];
+          ctx.fillStyle = g.flame && f < 0.7 ? INK.o : INK[c];
           ctx.fillRect(Math.round(g.left) + x * g.p, Math.round(g.top) + y * g.p, g.p, g.p);
         }
       }
       return night;
     },
   };
+}
+
+// How bright a flame is at a given time, about 0.3 to 1.25: a slow sway, a
+// quicker shiver, and a brief duck now and then. `seed` keeps neighbours apart.
+function flicker(now, seed) {
+  const t = now / 1000;
+  const sway = 0.14 * Math.sin(t * 2.3 + seed) + 0.08 * Math.sin(t * 5.7 + seed * 1.7);
+  const shiver = 0.07 * Math.sin(t * 13.1 + seed * 2.9);
+  const step = Math.floor(t * 8);
+  const duck = (Math.sin(step * 12.9898 + seed * 78.233) * 43758.5453) % 1;
+  return 0.95 + sway + shiver - (Math.abs(duck) > 0.92 ? 0.4 : 0);
 }
 
 // How dark it is, from the real sunrise and sunset of the day: night is 0 by
