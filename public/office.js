@@ -389,7 +389,7 @@ function paintArea(g, x, y, w, h, wallH, u, theme) {
     const length = u(150);
     for (let row = 0, ty = wallBottom; ty < y + h; row++, ty += plank) {
       g.fillRect(x, ty, w, 1);
-      for (let tx = x + ((row * 59) % length); tx < x + w; tx += length) g.fillRect(tx, ty, 1, plank);
+      for (let tx = x + ((row * 59) % length); tx < x + w; tx += length) g.fillRect(tx, ty, 1, Math.min(plank, y + h - ty));
     }
   } else {
     // Carpet: a quiet, regular speckle.
@@ -1080,7 +1080,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   // Along the wall, left: the door in the corner, bookshelves, the whiteboard.
   const backBase = wall + u(16);
   const inFront = backBase + u(36);
-  let cursor = x0 + u(24);
+  let cursor = x0 + ROOM_DOOR(u);
   drawDoor(g, cursor, wall, { p, u, sign: false });
   if (season === 'halloween') pumpkin(cursor + doorWidth(p) + u(2), wall + u(26), env);
   cursor += doorWidth(p) + u(20);
@@ -1609,6 +1609,36 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations };
 }
 
+// ---- Rooms joined into one floor plan
+const ROOM_DOOR = (u) => u(24); // from the room's left wall to its door
+const WALL_TOP = '#7d6a56'; // the walls seen from above
+const WALL_EDGE = '#4f4338';
+const THRESHOLD = '#c9b48f';
+const HALL_THEME = { wall: '#ece6d8', wallLow: '#e2dac8', wallStyle: 'plain', base: '#d3cab6', floor: '#efe8da', line: '#e2d9c7', floorStyle: 'tiles' };
+
+// A hallway under a short room: a low wall, tiles, a runner and a plant or two.
+function paintHall(g, { x0, x1, top, bottom }, seed, { p, u }) {
+  const random = seeded(seed);
+  const look = dressing(THEMES[0], random);
+  const wallH = Math.min(u(60), Math.round((bottom - top) * 0.4));
+  paintArea(g, x0, top, x1 - x0, bottom - top, wallH, u, HALL_THEME);
+  const floorMid = Math.round((top + wallH + bottom) / 2);
+  const runnerW = Math.round((x1 - x0) * (0.4 + random() * 0.3));
+  const rug = { ...look.rug(), style: random() < 0.5 ? 'stripes' : 'frame' }; // round or chequered runners look odd this long
+  paintRug(g, Math.round(x0 + (x1 - x0) / 2), floorMid, runnerW, Math.min(u(46), Math.round((bottom - top - wallH) * 0.5)), rug, p);
+  // Plants against the low wall, cut at the wall above if they are too tall.
+  g.save();
+  g.beginPath();
+  g.rect(x0, top, x1 - x0, bottom - top);
+  g.clip();
+  for (let k = random() < 0.5 ? 1 : 2; k > 0; k--) {
+    const plant = look.plant();
+    const left = k === 1 ? x0 + u(20) : x1 - u(20) - plant.w * p;
+    drawSprite(g, plant, Math.round(left), Math.round(top + wallH + u(16) - plant.h * p), p);
+  }
+  g.restore();
+}
+
 function canvasFor(width, height) {
   const canvas = document.createElement('canvas');
   const dpr = window.devicePixelRatio || 1;
@@ -1643,25 +1673,113 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     // The designed plan needs room for its three zones; narrow windows keep the generic one.
     zones.push(width >= u(1300) && height >= u(700) ? furnishShared(g, area, env) : furnish(g, area, env));
   } else {
-    const gap = Math.max(24, u(28));
-    const roomW = Math.min(u(760), width - 2 * gap);
-    const roomH = u(760);
+    // The rooms share their walls, like the plan of a flat. Widths and heights
+    // vary a little; under a room shorter than its row, a hallway fills the
+    // gap. Back doors open onto the room or hallway above, doorways join the
+    // neighbours, and the building's entrance is at the bottom. Purely for the
+    // look: Clawds stay home.
+    const wallT = Math.max(10, u(20));
+    const margin = u(32);
+    const roomMax = Math.min(u(760), width - 2 * wallT - margin);
     const n = Math.max(1, names.length);
-    const cols = Math.max(1, Math.floor((width - gap) / (roomW + gap)));
-    const used = Math.min(cols, n);
-    const left0 = Math.round((width - used * roomW - (used - 1) * gap) / 2);
-    height = Math.max(viewHeight, gap + Math.ceil(n / cols) * (roomH + gap));
+    const cols = Math.max(1, Math.floor((width - margin - wallT) / (roomMax + wallT)));
+    const rows = Math.ceil(n / cols);
+    const vary = (i, key, low) => low + (1 - low) * seeded(`${names[i] ?? ''}#${key}`)();
+    const widths = Array.from({ length: n }, (_, i) => Math.round(roomMax * vary(i, 'w', 0.84)));
+    const tall = u(800);
+    const inRow = (r) => Array.from({ length: Math.min(cols, n - r * cols) }, (_, k) => r * cols + k);
+    const rowW = (r) => inRow(r).reduce((sum, i) => sum + widths[i] + wallT, wallT);
+    const planW = Math.max(...Array.from({ length: rows }, (_, r) => rowW(r)));
+    const left0 = Math.round((width - planW) / 2) + wallT;
+    const cells = []; // rooms, then the hallways under the short ones
+    const rooms = [];
+    let rowTop = margin + wallT;
+    for (let r = 0; r < rows; r++) {
+      const last = r === rows - 1;
+      // Above the last row, about half the rooms (at least one) give up their
+      // bottom to a hallway; the last row keeps a ragged edge instead.
+      const pick = inRow(r).map((i) => vary(i, 'hall', 0));
+      const hallFor = (k) => !last && (pick[k] < 0.5 || pick[k] === Math.min(...pick));
+      let x0 = left0;
+      inRow(r).forEach((i, k) => {
+        const hallH = Math.round(u(120) + u(50) * vary(i, 'hall-h', 0));
+        const h = last ? Math.round(tall * vary(i, 'h', 0.85)) : hallFor(k) ? tall - hallH - wallT : tall;
+        const room = { x0, x1: x0 + widths[i], top: rowTop, bottom: rowTop + h, r, c: k, i };
+        if (hallFor(k)) cells.push({ x0, x1: room.x1, top: room.bottom + wallT, bottom: rowTop + tall, r, c: k, hall: true, i });
+        rooms.push(room);
+        x0 = room.x1 + wallT;
+      });
+      rowTop += tall + wallT;
+    }
+    cells.unshift(...rooms);
+    const planBottom = Math.max(...cells.map((cell) => cell.bottom));
+    height = Math.max(viewHeight, planBottom + wallT + u(64));
     const { canvas, g } = canvasFor(width, height);
     background = canvas;
-    g.fillStyle = '#ddd6c6'; // corridor between the rooms
+    g.fillStyle = '#d3ccbc'; // outside
     g.fillRect(0, 0, width, height);
-    for (let i = 0; i < n; i++) {
-      const x0 = left0 + (i % cols) * (roomW + gap);
-      const top = gap + Math.floor(i / cols) * (roomH + gap);
-      g.fillStyle = '#c4baa3'; // room walls
-      g.fillRect(x0 - px, top - px, roomW + 2 * px, roomH + 2 * px);
-      zones.push(furnish(g, { x0, x1: x0 + roomW, top, bottom: top + roomH, name: names[i] ?? '', seed: `${names[i] ?? ''}#${i}`, maxPerRow: 3, maxRows: 2 }, env));
+    // Walls first, as one dark-edged mass; each room then paints its inside.
+    const frame = (grow, color) => {
+      g.fillStyle = color;
+      for (const { x0, x1, top, bottom } of cells) g.fillRect(x0 - grow, top - grow, x1 - x0 + 2 * grow, bottom - top + 2 * grow);
+    };
+    frame(wallT + px, WALL_EDGE);
+    frame(wallT, WALL_TOP);
+    frame(px, WALL_EDGE);
+    for (const room of rooms) {
+      const { x0, x1, top, bottom, i } = room;
+      zones[i] = furnish(g, { x0, x1, top, bottom, name: names[i] ?? '', seed: `${names[i] ?? ''}#${i}`, maxPerRow: 3, maxRows: 2 }, env);
     }
+    for (const hall of cells.filter((cell) => cell.hall)) paintHall(g, hall, `${names[hall.i] ?? ''}#hall`, env);
+
+    // A gap through a wall: the threshold, edged on the two sides you walk past.
+    const opening = (x, y, w, h, across) => {
+      g.fillStyle = THRESHOLD;
+      g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+      g.fillStyle = WALL_EDGE;
+      if (across) {
+        g.fillRect(Math.round(x - px), Math.round(y), px, Math.round(h));
+        g.fillRect(Math.round(x + w), Math.round(y), px, Math.round(h));
+      } else {
+        g.fillRect(Math.round(x), Math.round(y - px), Math.round(w), px);
+        g.fillRect(Math.round(x), Math.round(y + h), Math.round(w), px);
+      }
+    };
+    const cellAbove = (x, w, top) => cells.find((cell) => cell.bottom + wallT === top && cell.x0 <= x && x + w <= cell.x1);
+    const rightOf = (cell) => cells.find((other) => other.x0 === cell.x1 + wallT && other.top < cell.bottom && cell.top < other.bottom);
+    for (const room of rooms) {
+      // The back door, when something lies behind it.
+      const doorX = room.x0 + ROOM_DOOR(u) + u(4);
+      const doorW = doorWidth(px) - u(8);
+      if (cellAbove(doorX, doorW, room.top)) opening(doorX, room.top - wallT - px, doorW, wallT + px, true);
+    }
+    for (const cell of cells) {
+      const random = seeded(`${names[cell.i] ?? ''}#${cell.hall ? 'hall' : 'room'}-side`);
+      const next = rightOf(cell);
+      if (next) {
+        // Side doorways stay clear of the back walls, where the furniture stands.
+        const low = Math.max(cell.hall ? cell.top + u(30) : cell.top + u(170), next.hall ? next.top + u(30) : next.top + u(170));
+        const high = Math.min(cell.bottom, next.bottom) - u(30);
+        const h = Math.min(u(90), high - low);
+        if (h >= u(50)) opening(cell.x1, low + random() * (high - low - h), next.x0 - cell.x1, h, false);
+      }
+      if (cell.hall) {
+        // A hallway opens onto the room above it.
+        const room = rooms.find((other) => other.i === cell.i && !other.hall);
+        const w = u(80);
+        opening(room.x0 + u(140) + random() * (room.x1 - room.x0 - u(220) - w), room.bottom, w, wallT, true);
+      }
+    }
+    // The way in: a gap in the bottom wall of the first room of the last row,
+    // a mat and a path out to the street.
+    const hallway = rooms.find((room) => room.r === rows - 1 && room.c === 0);
+    const gateW = u(70);
+    const gateX = Math.round(hallway.x0 + (hallway.x1 - hallway.x0) * 0.36);
+    opening(gateX, hallway.bottom, gateW, wallT + px, true);
+    g.fillStyle = '#c9c0ac';
+    g.fillRect(gateX, hallway.bottom + wallT + px, gateW, height - hallway.bottom);
+    g.fillStyle = INK.H;
+    g.fillRect(gateX + u(6), hallway.bottom + wallT + px + u(6), gateW - u(12), u(14));
   }
 
   return {
