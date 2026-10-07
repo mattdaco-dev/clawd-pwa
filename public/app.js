@@ -1,4 +1,4 @@
-import { DECORS, DEFAULT_SETTINGS, LAYOUTS, PIXEL_SIZES } from './decor.js';
+import { DECORS, DEFAULT_SETTINGS, LAYOUTS, OUTSIDES, PIXEL_SIZES } from './decor.js';
 import { createDemoBar, createDemoModel } from './demo.js';
 import { createGallery } from './gallery.js';
 import { createLive } from './live.js';
@@ -11,6 +11,7 @@ try {
 } catch {}
 if (!(settings.decor in DECORS)) settings.decor = DEFAULT_SETTINGS.decor;
 if (!(settings.layout in LAYOUTS)) settings.layout = DEFAULT_SETTINGS.layout;
+if (!(settings.outside in OUTSIDES)) settings.outside = DEFAULT_SETTINGS.outside;
 if (!PIXEL_SIZES.includes(settings.px)) settings.px = DEFAULT_SETTINGS.px;
 const canNotify = 'Notification' in window && 'serviceWorker' in navigator;
 if (!canNotify || Notification.permission !== 'granted') settings.notify = 'off';
@@ -39,12 +40,12 @@ menu.addEventListener('click', (e) => {
   if (e.target.closest('a')) setMenu(false);
 });
 
-// The layout only means something with furniture: greyed out without a decor.
+// The layout and the outside only mean something with furniture: greyed out without a decor.
 function renderSettings() {
   for (const input of menu.querySelectorAll('.setting input')) {
     input.checked = String(settings[input.name]) === input.value;
   }
-  menu.querySelector('[data-needs-decor]').disabled = settings.decor === 'none';
+  for (const set of menu.querySelectorAll('[data-needs-decor]')) set.disabled = settings.decor === 'none';
 }
 
 for (const input of menu.querySelectorAll('.setting input')) {

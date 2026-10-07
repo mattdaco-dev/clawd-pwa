@@ -7,6 +7,7 @@
 // pixel size, so the whole office zooms with the Clawds.
 import { INK, drawSprite, sprite } from './pixels.js';
 import { TREE_GIFTS, flicker, seasonCritters, seasonFloor, seasonTables, seasonWall, skyEvent, snowSill, treeTrain, wallSpiders } from './seasons.js';
+import { paintOutside } from './outdoors.js';
 import { sunTimes } from './sun.js';
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -352,22 +353,36 @@ const WINDOW_SHAPES = [
   ],
 ];
 const WINDOW_FRAMES = ['W', 'W', 'K', 'D', 'G'];
+// Aboard the spaceship: portholes onto the stars.
+const PORTHOLES = [
+  ['...FFFF...', '.FFSSSSFF.', '.FSSSSSSF.', 'FSSSSSSSSF', 'FSSSSSSSSF', 'FSSSSSSSSF', 'FSSSSSSSSF', '.FSSSSSSF.', '.FFSSSSFF.', '...FFFF...'],
+  ['..FFFFFFFFFFFFFF..', '.FSSSSSSSSSSSSSSF.', ...Array.from({ length: 6 }, () => 'FSSSSSSSSSSSSSSSSF'), '.FSSSSSSSSSSSSSSF.', '..FFFFFFFFFFFFFF..'],
+];
 
 // maxCols keeps to the shapes that fit the wall, when one does.
-function windowModel(random, maxCols = Infinity) {
+function windowModel(random, maxCols = Infinity, world = null) {
   const pickOne = (list) => list[Math.floor(random() * list.length)];
-  const frame = pickOne(WINDOW_FRAMES);
-  const fitting = WINDOW_SHAPES.filter((rows) => rows[0].length <= maxCols);
-  const model = sprite(pickOne(fitting.length ? fitting : WINDOW_SHAPES).map((row) => row.replaceAll('F', frame)));
+  const frame = pickOne(world === 'espace' ? ['G', 'A', 'K'] : WINDOW_FRAMES);
+  const shapes = world === 'espace' ? PORTHOLES : WINDOW_SHAPES;
+  const fitting = shapes.filter((rows) => rows[0].length <= maxCols);
+  const model = sprite(pickOne(fitting.length ? fitting : shapes).map((row) => row.replaceAll('F', frame)));
   model.glass = model.cells.filter(([, , c]) => c === 'S');
   return model;
 }
 
 // Bottoms line up whatever the shape; returns the window's top.
 const WINDOW_SILL = 14; // distance from the sill to the foot of the wall, at 5 px
-function drawWindow(g, model, left, wall, { p, u, skies, season }) {
+function drawWindow(g, model, left, wall, { p, u, skies, season, world }) {
   const top = wall - u(WINDOW_SILL) - model.h * p;
   drawSprite(g, model, left, top, p);
+  if (world === 'espace') {
+    // Deep space through the portholes, whatever the hour.
+    for (const [x, y] of model.glass) {
+      g.fillStyle = (x * 7 + y * 13) % 11 === 0 ? '#ffffff' : '#0b1026';
+      g.fillRect(Math.round(left) + x * p, Math.round(top) + y * p, p, p);
+    }
+    return;
+  }
   if (season === 'noel' || season === 'hiver') snowSill(g, left, top, model, p);
   skies.push({ left: Math.round(left), top: Math.round(top), model });
 }
@@ -396,9 +411,10 @@ const DOOR = sprite([
 const EXIT_SIGN = sprite(['PPPPPP', 'PWPPWP', 'PPPPPP']);
 const doorWidth = (p) => DOOR.w * p;
 
-function drawDoor(g, left, wall, { p, u, sign = true }) {
+function drawDoor(g, left, wall, { p, u, sign = true, world }) {
   const top = wall + u(4) - DOOR.h * p;
-  drawSprite(g, DOOR, left, top, p);
+  const look = WORLD_LOOK[world]?.door;
+  drawSprite(g, look ? recolor(DOOR, look) : DOOR, left, top, p);
   if (sign) drawSprite(g, EXIT_SIGN, left + 3 * p, top - 4 * p, p);
   g.fillStyle = INK.H;
   g.fillRect(Math.round(left - u(6)), Math.round(wall + u(6)), Math.round(DOOR.w * p + u(12)), Math.round(u(9)));
@@ -483,6 +499,40 @@ const THEMES = [
     fabrics: ['sage', 'denim', 'gray'], rugs: ['sage', 'denim', 'gray'], pots: ['T', 'A'] },
 ];
 
+// The beach hut and the spaceship have their own ambiances.
+const WORLD_THEMES = {
+  mer: [
+    { name: 'paillote', finishes: ['wood'], wall: '#e6cf98', wallLow: '#d4b877', wallStyle: 'bamboo', base: '#a8834a',
+      floor: '#e9d3a4', line: '#d6bc87', floorStyle: 'planks',
+      fabrics: ['terracotta', 'sage', 'denim'], rugs: ['terracotta', 'sage', 'cream'], pots: ['H', 'T'] },
+    { name: 'lagon', finishes: ['white', 'wood'], wall: '#dccb9c', wallLow: '#c9b37c', wallStyle: 'bamboo', base: '#9a7a45',
+      floor: '#f1e4c4', line: '#e2d0a6', floorStyle: 'planks',
+      fabrics: ['denim', 'rose', 'mustard'], rugs: ['denim', 'cream', 'rose'], pots: ['T', 'A'] },
+  ],
+  espace: [
+    { name: 'coque', finishes: ['white', 'dark'], wall: '#c9d1db', wallLow: '#b4bfcc', wallStyle: 'panels', base: '#7d8a99',
+      floor: '#a7b0bb', line: '#8c96a2', floorStyle: 'grate',
+      fabrics: ['gray', 'denim'], rugs: ['gray', 'denim'], pots: ['A', 'G'] },
+    { name: 'pont', finishes: ['dark', 'white'], wall: '#b7c3d1', wallLow: '#a1aebe', wallStyle: 'panels', base: '#5e6b7b',
+      floor: '#949eaa', line: '#7a8490', floorStyle: 'grate',
+      fabrics: ['denim', 'mustard', 'gray'], rugs: ['denim', 'gray', 'mustard'], pots: ['K', 'A'] },
+  ],
+};
+const themesOf = (world) => WORLD_THEMES[world] ?? THEMES;
+// The rest that changes with the world: the walls seen from above, the
+// hallways, the doors. No fireplace in a straw hut or a spaceship.
+const WORLD_LOOK = {
+  mer: {
+    wallTop: '#c9a35a', wallEdge: '#7d5f30', door: { O: 'M', L: 'y' },
+    hall: { wall: '#e6cf98', wallLow: '#d4b877', wallStyle: 'bamboo', base: '#a8834a', floor: '#efe0bb', line: '#dcc796', floorStyle: 'planks' },
+  },
+  espace: {
+    wallTop: '#4a525e', wallEdge: '#22272e', door: { D: 'K', O: 'G', L: 'o', Y: 'Y' },
+    hall: { wall: '#c9d1db', wallLow: '#b4bfcc', wallStyle: 'panels', base: '#7d8a99', floor: '#aab3be', line: '#8c96a2', floorStyle: 'grate' },
+  },
+};
+const NO_FIRE = new Set(['mer', 'espace']);
+
 function paintArea(g, x, y, w, h, wallH, u, theme) {
   const wallBottom = y + wallH;
   g.fillStyle = theme.wall;
@@ -495,6 +545,33 @@ function paintArea(g, x, y, w, h, wallH, u, theme) {
     g.fillRect(x, rail, w, Math.max(2, u(3)));
   } else if (theme.wallStyle === 'stripes') {
     for (let sx = x + u(12); sx < x + w; sx += u(28)) g.fillRect(sx, y, u(12), wallH);
+  } else if (theme.wallStyle === 'bamboo') {
+    // Bamboo poles side by side, ringed at their nodes, under a straw fringe.
+    const pole = Math.max(3, u(10));
+    for (let sx = x, k = 0; sx < x + w; sx += pole, k++) {
+      const pw = Math.min(pole, x + w - sx);
+      g.fillStyle = k % 2 ? theme.wallLow : theme.wall;
+      g.fillRect(sx, y, pw, wallH);
+      g.fillStyle = theme.base;
+      g.fillRect(sx, y, 1, wallH);
+      for (let ny = y + u(16) + ((k * 37) % Math.max(1, u(30))); ny < wallBottom; ny += u(34)) g.fillRect(sx, ny, pw, Math.max(1, u(2)));
+    }
+    g.fillStyle = '#d9b866';
+    g.fillRect(x, y, w, u(10));
+    g.fillStyle = '#b8923f';
+    for (let sx = x, k = 0; sx < x + w; sx += u(6), k++) g.fillRect(sx, y + u(10), Math.max(1, u(3)), u(3 + ((k * 7) % 5)));
+  } else if (theme.wallStyle === 'panels') {
+    // Hull panels, riveted, with a light strip along the top half.
+    const pw = u(46);
+    const ph = Math.round(wallH / 2);
+    g.fillRect(x, y + ph, w, wallH - ph);
+    g.fillStyle = theme.base;
+    for (let sx = x + pw; sx < x + w; sx += pw) g.fillRect(sx, y, 1, wallH);
+    g.fillRect(x, y + ph, w, 1);
+    const dot = Math.max(1, u(2));
+    for (let sx = x + u(4); sx < x + w; sx += pw) for (const ry of [y + u(4), y + ph - u(5), y + ph + u(4)]) g.fillRect(sx, ry, dot, dot);
+    g.fillStyle = '#7fd6e8';
+    g.fillRect(x, y + Math.round(ph * 0.5), w, dot);
   }
   g.fillStyle = theme.base;
   g.fillRect(x, wallBottom - u(6), w, u(6));
@@ -514,6 +591,13 @@ function paintArea(g, x, y, w, h, wallH, u, theme) {
       g.fillRect(x, ty, w, 1);
       for (let tx = x + ((row * 59) % length); tx < x + w; tx += length) g.fillRect(tx, ty, 1, Math.min(plank, y + h - ty));
     }
+  } else if (theme.floorStyle === 'grate') {
+    // Deck plating: a grid of plates, a bolt in each corner.
+    const cell = u(28);
+    const bar = Math.max(1, u(2));
+    for (let ty = wallBottom + cell; ty < y + h; ty += cell) g.fillRect(x, ty, w, bar);
+    for (let tx = x + cell; tx < x + w; tx += cell) g.fillRect(tx, wallBottom, bar, floorH);
+    for (let ty = wallBottom + u(5); ty < y + h; ty += cell) for (let tx = x + u(5); tx < x + w; tx += cell) g.fillRect(tx, ty, bar, bar);
   } else {
     // Carpet: a quiet, regular speckle.
     const step = u(14);
@@ -1222,7 +1306,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows, catHo
   const int = (a, b) => Math.floor(between(a, b + 1));
   const chance = (q) => random() < q;
   const pickOne = (list) => list[Math.floor(random() * list.length)];
-  const theme = pickOne(THEMES);
+  const theme = pickOne(themesOf(env.world));
   const look = dressing(theme, random);
 
   paintArea(g, x0, top, W, bottom - top, wallH, u, theme);
@@ -1277,7 +1361,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows, catHo
   const inFront = backBase + u(36);
   let cursor = x0 + ROOM_DOOR(u);
   const doorLeft = cursor;
-  drawDoor(g, cursor, wall, { p, u, sign: false });
+  drawDoor(g, cursor, wall, { p, u, sign: false, world: env.world });
   if (season === 'halloween') pumpkin(cursor + doorWidth(p) + u(2), wall + u(26), env);
   cursor += doorWidth(p) + u(20);
   let shelfCount = int(1, W >= u(900) ? 3 : W >= u(560) ? 2 : 1);
@@ -1318,11 +1402,11 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows, catHo
 
   const winTo = right - u(30);
   // The fireplace, after the whiteboard, even if it takes the windows' place.
-  if (winTo - winFrom >= FIREPLACE.w * p + u(10)) winFrom += fireplace(g, winFrom, wall, env) + u(30);
+  if (!NO_FIRE.has(env.world) && winTo - winFrom >= FIREPLACE.w * p + u(10)) winFrom += fireplace(g, winFrom, wall, env) + u(30);
   // As many windows as fit, of one shape, evenly spaced; the clock in the
   // widest stretch of bare wall left.
   const span = winTo - winFrom;
-  const pane = windowModel(random, (span - u(20)) / p);
+  const pane = windowModel(random, (span - u(20)) / p, env.world);
   const paneW = pane.w * p;
   const fit = Math.max(0, Math.floor((span + u(30)) / (paneW + u(30))));
   const panes = fit >= 2 && chance(0.3) ? fit - 1 : fit;
@@ -1330,7 +1414,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows, catHo
   let at = winFrom + space;
   const bare = [{ x: winFrom + space / 2, w: space }];
   for (let i = 0; i < panes; i++) {
-    drawWindow(g, pane, at, wall, { p, u, skies, season });
+    drawWindow(g, pane, at, wall, { p, u, skies, season, world: env.world });
     at += paneW;
     bare.push({ x: at + space / 2, w: space });
     at += space;
@@ -1499,7 +1583,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   const between = (a, b) => a + random() * (b - a);
   const int = (a, b) => Math.floor(between(a, b + 1));
   const pickOne = (list) => list[Math.floor(random() * list.length)];
-  const theme = pickOne(THEMES);
+  const theme = pickOne(themesOf(env.world));
   const look = dressing(theme, random);
 
   paintArea(g, x0, top, W, bottom - top, wallH, u, theme);
@@ -1797,9 +1881,9 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   const wallFrom = shelfStart + shelves * (SHELF.w * p + u(4)) + u(30);
   // The fireplace closes the wall on the lounge side, before the kitchen.
   const fireLeft = kitchen - u(60) - PAINTING.w * p - FIREPLACE.w * p;
-  fireplace(g, fireLeft, wall, env);
+  if (!NO_FIRE.has(env.world)) fireplace(g, fireLeft, wall, env);
   const wallTo = fireLeft - u(30);
-  const pane = windowModel(random);
+  const pane = windowModel(random, Infinity, env.world);
   const winW = pane.w * p;
   const gaps = []; // middle and width of each stretch of wall between groups
   let doorX = between(wallFrom + u(40), Math.max(wallFrom + u(40), wallTo - u(120)));
@@ -1809,7 +1893,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
     if (doorX !== null && wx + winW > doorX) {
       const doorLeft = wx + u(20);
       sharedDoor = doorLeft;
-      drawDoor(g, doorLeft, wall, { p, u });
+      drawDoor(g, doorLeft, wall, { p, u, world: env.world });
       if (season === 'halloween') {
         pumpkin(doorLeft - u(8) - PUMPKIN.w * p, wall + u(26), env);
         pumpkin(doorLeft + doorWidth(p) + u(8), wall + u(26), env);
@@ -1820,7 +1904,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
       continue;
     }
     const n = Math.min(int(1, 3), Math.floor((wallTo - wx + u(8)) / (winW + u(8))));
-    for (let k = 0; k < n; k++) drawWindow(g, pane, wx + k * (winW + u(8)), wall, { p, u, skies, season });
+    for (let k = 0; k < n; k++) drawWindow(g, pane, wx + k * (winW + u(8)), wall, { p, u, skies, season, world: env.world });
     wx += n * (winW + u(8));
     const gap = u(between(50, 180));
     gaps.push({ x: wx + gap / 2, w: gap });
@@ -1880,11 +1964,12 @@ const HALL_THEME = { wall: '#ece6d8', wallLow: '#e2dac8', wallStyle: 'plain', ba
 
 // A hallway under a short room: a low wall hung with a few pictures, tiles and
 // a plant or two.
-function paintHall(g, { x0, x1, top, bottom, door, glass }, seed, { p, u }) {
+function paintHall(g, { x0, x1, top, bottom, door, glass }, seed, { p, u, world }) {
   const random = seeded(seed);
-  const look = dressing(THEMES[0], random);
+  const look = dressing(themesOf(world)[0], random);
+  const theme = WORLD_LOOK[world]?.hall ?? HALL_THEME;
   const wallH = Math.min(u(60), Math.round((bottom - top) * 0.4));
-  paintArea(g, x0, top, x1 - x0, bottom - top, wallH, u, HALL_THEME);
+  paintArea(g, x0, top, x1 - x0, bottom - top, wallH, u, theme);
   if (glass) {
     // A glass partition: panes between thin mullions, and a glass door.
     g.fillStyle = GLASS;
@@ -1905,7 +1990,7 @@ function paintHall(g, { x0, x1, top, bottom, door, glass }, seed, { p, u }) {
     g.fillRect(door.x + door.w - 4 * p, top + Math.round(wallH * 0.45), 2 * p, p); // handle
   } else {
     // The doorway from the room above cuts through the low wall.
-    g.fillStyle = HALL_THEME.floor;
+    g.fillStyle = theme.floor;
     g.fillRect(door.x, top, door.w, wallH);
     g.fillStyle = WALL_EDGE;
     g.fillRect(door.x - p, top, p, wallH);
@@ -1953,7 +2038,7 @@ function canvasFor(width, height) {
 
 // Rooms: one fixed-size room per session, laid out in a grid that grows
 // downwards (the page scrolls). Shared: one office the size of the window.
-export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms', season = null, salt = '' } = {}) {
+export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms', season = null, salt = '', world = 'ville' } = {}) {
   const k = px / 5;
   const u = (n) => Math.round(n * k);
   const props = [];
@@ -1966,26 +2051,81 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   const tables = []; // meeting and café tables, for the season's food
   const workLights = []; // desk lamps, screens and reading lamps, lit by whoever works there
   const ghosts = []; // little ghosts a click frightens
-  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates, salt, walls, tables, workLights, ghosts };
+  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates, salt, walls, tables, workLights, ghosts, world };
   // Seeds come from the session names; a salt gives the same names another layout.
   const seedOf = (i) => `${salt}${names[i] ?? ''}`;
   const zones = [];
   let height = viewHeight;
   let background;
 
-  if (layout === 'shared') {
-    ({ canvas: background } = canvasFor(width, height));
-    const g = background.getContext('2d');
+  const wallT = Math.max(10, u(20));
+  const wallTop = WORLD_LOOK[world]?.wallTop ?? WALL_TOP;
+  const wallEdge = WORLD_LOOK[world]?.wallEdge ?? WALL_EDGE;
+  let g = null;
+  // Walls first, as one dark-edged mass around the rectangles; each room then paints its inside.
+  const frame = (rects, grow, color) => {
+    g.fillStyle = color;
+    for (const { x0, x1, top, bottom } of rects) g.fillRect(x0 - grow, top - grow, x1 - x0 + 2 * grow, bottom - top + 2 * grow);
+  };
+  const walls3 = (rects) => {
+    frame(rects, wallT + px, wallEdge);
+    frame(rects, wallT, wallTop);
+    frame(rects, px, wallEdge);
+  };
+  // A gap through a wall: the threshold, edged on the two sides you walk past.
+  const opening = (x, y, w, h, across) => {
+    g.fillStyle = THRESHOLD;
+    g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+    g.fillStyle = wallEdge;
+    if (across) {
+      g.fillRect(Math.round(x - px), Math.round(y), px, Math.round(h));
+      g.fillRect(Math.round(x + w), Math.round(y), px, Math.round(h));
+    } else {
+      g.fillRect(Math.round(x), Math.round(y - px), Math.round(w), px);
+      g.fillRect(Math.round(x), Math.round(y + h), Math.round(w), px);
+    }
+  };
+  // The ways out, which the outside leads on from: the entrance through the
+  // bottom wall with a mat outside it, back doors through the top wall.
+  const blocks = []; // the building, walls included
+  const exits = [];
+  const outline = ({ x0, x1, top, bottom }) => ({ x0: x0 - wallT - px, y0: top - wallT - px, x1: x1 + wallT + px, y1: bottom + wallT + px });
+  const frontDoor = (x, w, bottom) => {
+    opening(x, bottom, w, wallT + px, true);
+    g.fillStyle = INK.H;
+    g.fillRect(x + u(6), bottom + wallT + px + u(6), w - u(12), u(14));
+    exits.push({ x, w, y: bottom + wallT + px, dir: 'down' });
+  };
+  const backDoor = (x, w, top) => {
+    opening(x, top - wallT - px, w, wallT + px, true);
+    exits.push({ x, w, y: top - wallT - px, dir: 'up' });
+  };
+
+  const bare = world === 'none';
+  if (layout === 'shared' && bare) {
+    // No outside: the office fills the window.
+    ({ canvas: background, g } = canvasFor(width, height));
     const area = { x0: 0, x1: width, top: 0, bottom: height, name: '', seed: `${salt}shared`, maxPerRow: 8, maxRows: 4, catHome: true };
-    // The designed plan needs room for its three zones; narrow windows keep the generic one.
     zones.push(width >= u(1300) && height >= u(700) ? furnishShared(g, area, env) : furnish(g, area, env));
+  } else if (layout === 'shared') {
+    // One office in the middle of its grounds.
+    ({ canvas: background, g } = canvasFor(width, height));
+    const side = world === 'espace' ? u(130) : u(48); // the ship needs room for its nose and engines
+    const area = { x0: side + wallT, x1: width - side - wallT, top: u(100) + wallT, bottom: height - u(170) - wallT, name: '', seed: `${salt}shared`, maxPerRow: 8, maxRows: 4, catHome: true };
+    walls3([area]);
+    // The designed plan needs room for its three zones; narrow windows keep the generic one.
+    zones.push(area.x1 - area.x0 >= u(1300) && area.bottom - area.top >= u(700) ? furnishShared(g, area, env) : furnish(g, area, env));
+    blocks.push(outline(area));
+    const gateW = u(70);
+    frontDoor(Math.round((area.x0 + area.x1 - gateW) / 2), gateW, area.bottom);
+    const { door } = zones[0];
+    if (door) backDoor(Math.round(door.x - doorWidth(px) / 2 + u(4)), doorWidth(px) - u(8), area.top);
   } else {
     // The rooms share their walls, like the plan of a flat. Widths and heights
     // vary a little; under a room shorter than its row, a hallway fills the
     // gap. Back doors open onto the room or hallway above, doorways join the
     // neighbours, and the building's entrance is at the bottom. Purely for the
     // look: Clawds stay home.
-    const wallT = Math.max(10, u(20));
     const margin = u(32);
     const roomMax = Math.min(u(760), width - 2 * wallT - margin);
     const n = Math.max(1, names.length);
@@ -2003,7 +2143,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     const topExtra = u(60); // the top row's rooms start a little lower or higher
     const cells = []; // rooms, then the hallways under the short ones
     const rooms = [];
-    let rowTop = margin + wallT;
+    let rowTop = (bare ? margin : u(120)) + wallT; // a strip of outside behind the building
     for (let r = 0; r < rows; r++) {
       const last = r === rows - 1;
       // Above the last row, about half the rooms (at least one) give up their
@@ -2056,38 +2196,16 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
       }
     }
     const planBottom = Math.max(...cells.map((cell) => cell.bottom));
-    height = Math.max(viewHeight, planBottom + wallT + u(64));
-    const { canvas, g } = canvasFor(width, height);
-    background = canvas;
-    g.fillStyle = '#d3ccbc'; // outside
-    g.fillRect(0, 0, width, height);
-    // Walls first, as one dark-edged mass; each room then paints its inside.
-    const frame = (grow, color) => {
-      g.fillStyle = color;
-      for (const { x0, x1, top, bottom } of cells) g.fillRect(x0 - grow, top - grow, x1 - x0 + 2 * grow, bottom - top + 2 * grow);
-    };
-    frame(wallT + px, WALL_EDGE);
-    frame(wallT, WALL_TOP);
-    frame(px, WALL_EDGE);
+    height = Math.max(viewHeight, planBottom + wallT + (bare ? u(64) : u(230))); // and a wider one in front
+    ({ canvas: background, g } = canvasFor(width, height));
+    walls3(cells);
+    blocks.push(...cells.map(outline));
     for (const room of rooms) {
       const { x0, x1, top, bottom, i } = room;
       zones[i] = furnish(g, { x0, x1, top, bottom, name: names[i] ?? '', seed: `${seedOf(i)}#${i}`, maxPerRow: 3, maxRows: 2, catHome: i === 0 }, env);
     }
     for (const hall of cells.filter((cell) => cell.hall)) paintHall(g, hall, `${seedOf(hall.i)}#hall`, env);
 
-    // A gap through a wall: the threshold, edged on the two sides you walk past.
-    const opening = (x, y, w, h, across) => {
-      g.fillStyle = THRESHOLD;
-      g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
-      g.fillStyle = WALL_EDGE;
-      if (across) {
-        g.fillRect(Math.round(x - px), Math.round(y), px, Math.round(h));
-        g.fillRect(Math.round(x + w), Math.round(y), px, Math.round(h));
-      } else {
-        g.fillRect(Math.round(x), Math.round(y - px), Math.round(w), px);
-        g.fillRect(Math.round(x), Math.round(y + h), Math.round(w), px);
-      }
-    };
     const cellAbove = (x, w, top) => cells.find((cell) => cell.bottom + wallT === top && cell.x0 <= x && x + w <= cell.x1);
     const rightOf = (cell) => cells.filter((other) => other.x0 === cell.x1 + wallT && sideSpan(cell, other));
     for (const room of rooms) {
@@ -2095,6 +2213,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
       const doorX = room.x0 + ROOM_DOOR(u) + u(4);
       const doorW = doorWidth(px) - u(8);
       if (cellAbove(doorX, doorW, room.top)) opening(doorX, room.top - wallT - px, doorW, wallT + px, true);
+      else if (room.r === 0 && !bare) backDoor(doorX, doorW, room.top);
     }
     for (const cell of cells) {
       const random = seeded(`${seedOf(cell.i)}#${cell.hall ? 'hall' : 'room'}-side`);
@@ -2113,16 +2232,22 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
         g.fillRect(cell.x0, cell.top - wallT + px, cell.x1 - cell.x0, wallT - 2 * px);
       } else if (cell.hall) opening(cell.door.x, cell.top - wallT, cell.door.w, wallT, true);
     }
-    // The way in: a gap in the bottom wall of the first room of the last row,
-    // a mat and a path out to the street.
+    // The way in: a gap in the bottom wall of the first room of the last row.
     const hallway = rooms.find((room) => room.r === rows - 1 && room.c === 0);
     const gateW = u(70);
-    const gateX = Math.round(hallway.x0 + (hallway.x1 - hallway.x0) * 0.36);
-    opening(gateX, hallway.bottom, gateW, wallT + px, true);
-    g.fillStyle = '#c9c0ac';
-    g.fillRect(gateX, hallway.bottom + wallT + px, gateW, Math.max(12, u(56)));
-    g.fillStyle = INK.H;
-    g.fillRect(gateX + u(6), hallway.bottom + wallT + px + u(6), gateW - u(12), u(14));
+    frontDoor(Math.round(hallway.x0 + (hallway.x1 - hallway.x0) * 0.36), gateW, hallway.bottom);
+  }
+
+  // The outside, painted apart and slipped under the building.
+  // Nothing to do when the office fills the window.
+  if (blocks.length) {
+    const outside = canvasFor(width, height);
+    paintOutside(outside.g, env, { width, height, blocks, exits, random: seeded(`${salt}${world}#outside#${names.join('|')}`) });
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = 'destination-over';
+    g.drawImage(outside.canvas, 0, 0);
+    g.restore();
   }
 
   seasonTables(env);

@@ -3,10 +3,12 @@
 // than the window when rooms overflow), the zones Clawds walk in with their
 // stations, depth-sorted props and an overlay drawn every frame.
 import { buildOffice } from './office.js';
+import { WORLDS } from './outdoors.js';
 
 export const LAYOUTS = { rooms: 'Salles', shared: 'Open space partagé' };
 export const PIXEL_SIZES = [1, 2, 3, 4, 5, 6];
-export const DEFAULT_SETTINGS = { decor: 'open-space', layout: 'rooms', px: 4, notify: 'off' };
+export const OUTSIDES = { random: 'Au hasard', none: 'Aucun', ...WORLDS };
+export const DEFAULT_SETTINGS = { decor: 'open-space', layout: 'rooms', px: 4, notify: 'off', outside: 'random' };
 
 // No furniture: an empty floor split in columns, no stations, Clawds wander anywhere.
 function buildBare(width, height, names, { px }) {
