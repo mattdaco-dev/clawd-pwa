@@ -1,8 +1,8 @@
 // Weather outside the windows: the current conditions from Open-Meteo (no API
 // key), refreshed every half hour. `?meteo=pluie` (or soleil, nuages,
 // brouillard, neige, orage) forces one, to try them out.
-const LAT = 49.61; // Luxembourg
-const LON = 6.13;
+export const LAT = 49.61; // Luxembourg, also used for the sunrise and sunset
+export const LON = 6.13;
 const REFRESH = 30 * 60_000;
 
 const FORCED = {

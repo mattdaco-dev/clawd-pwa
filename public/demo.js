@@ -1,4 +1,5 @@
 import { DECORS, LAYOUTS, PIXEL_SIZES } from './decor.js';
+import { sunTimes } from './sun.js';
 
 // The demo view: made-up sessions instead of the server's, and a bar to try
 // every mode of the scene. Sessions follow a looping script unless one is
@@ -109,8 +110,16 @@ export function createDemoModel() {
   return model;
 }
 
-// Pairs rather than an object: numeric keys would jump ahead of 'auto'.
-const HOURS = [['auto', 'Maintenant'], ['10', 'Jour'], ['19.5', 'Coucher'], ['23', 'Nuit']];
+const HOURS = [['auto', 'Maintenant'], ['sunrise', 'Lever'], ['noon', 'Jour'], ['sunset', 'Coucher'], ['night', 'Nuit']];
+// Today's hour for each moment, from the real sunrise and sunset.
+function hourOf(moment) {
+  const { sunrise, sunset } = sunTimes(new Date());
+  if (moment === 'sunrise') return sunrise;
+  if (moment === 'sunset') return sunset;
+  if (moment === 'noon') return (sunrise + sunset) / 2;
+  return (sunset + 3) % 24; // well into the night
+}
+const clock = (h) => `${Math.floor(h)}h${String(Math.round((h % 1) * 60) % 60).padStart(2, '0')}`;
 const WEATHERS = { auto: 'Réelle', clear: 'Soleil', cloudy: 'Nuages', fog: 'Brouillard', rain: 'Pluie', snow: 'Neige', storm: 'Orage' };
 const SEASONS = { auto: 'Du moment', none: 'Aucune', halloween: 'Halloween', noel: 'Noël' };
 
@@ -132,7 +141,7 @@ export function createDemoBar(root, model, scene, settings) {
 
   function applyView() {
     scene.setView({
-      hour: view.hour === 'auto' ? null : Number(view.hour),
+      hour: view.hour === 'auto' ? null : hourOf(view.hour),
       weather: view.weather,
       season: view.season === 'auto' ? 'auto' : view.season === 'none' ? null : view.season,
     });
@@ -153,7 +162,7 @@ export function createDemoBar(root, model, scene, settings) {
         <button type="button" data-act="reseed"${current.decor === 'none' ? ' disabled' : ''}>Régénérer le décor</button>
       </div>
       <div class="demo-row">
-        <span class="demo-label">Heure</span>${seg('hour', HOURS, view.hour)}
+        <span class="demo-label">Heure</span>${seg('hour', HOURS.map(([v, label]) => [v, v === 'auto' ? label : `${label} ${clock(hourOf(v))}`]), view.hour)}
         <label class="demo-label">Météo <select data-view="weather">${options(WEATHERS, view.weather)}</select></label>
         <label class="demo-label">Saison <select data-view="season">${options(SEASONS, view.season)}</select></label>
       </div>`;

@@ -35,6 +35,9 @@ const INKS = {
   // Pumpkins
   o: '#e98a2f',
   n: '#b5611d',
+  // Halloween purple, Christmas greenery
+  v: '#6e4a9e',
+  g: '#2f6b3a',
 };
 
 function lighten(hex, amount) {

@@ -5,28 +5,11 @@
 //
 // Distances below are written for 5 px pixels and scaled by u() to the chosen
 // pixel size, so the whole office zooms with the Clawds.
-import { PALETTES } from './render.js';
-
-const INK = PALETTES.main;
+import { INK, drawSprite, sprite } from './pixels.js';
+import { seasonFloor, seasonWall, snowSill } from './seasons.js';
+import { sunTimes } from './sun.js';
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
-
-function sprite(rows) {
-  const cells = [];
-  rows.forEach((row, y) => [...row].forEach((c, x) => {
-    if (c !== '.') cells.push([x, y, c]);
-  }));
-  return { cells, w: rows[0].length, h: rows.length };
-}
-
-function drawSprite(ctx, s, left, top, p) {
-  left = Math.round(left);
-  top = Math.round(top);
-  for (const [x, y, c] of s.cells) {
-    ctx.fillStyle = INK[c];
-    ctx.fillRect(left + x * p, top + y * p, p, p);
-  }
-}
 
 // Desk seen from the front; the Clawd stands behind it, the monitor back on the left.
 const DESK_SURFACE = 7; // row of the desktop
@@ -299,9 +282,10 @@ function windowModel(random, maxCols = Infinity) {
 
 // Bottoms line up whatever the shape; returns the window's top.
 const WINDOW_SILL = 14; // distance from the sill to the foot of the wall, at 5 px
-function drawWindow(g, model, left, wall, { p, u, skies }) {
+function drawWindow(g, model, left, wall, { p, u, skies, season }) {
   const top = wall - u(WINDOW_SILL) - model.h * p;
   drawSprite(g, model, left, top, p);
+  if (season === 'noel') snowSill(g, left, top, model, p);
   skies.push({ left: Math.round(left), top: Math.round(top), model });
 }
 
@@ -1119,6 +1103,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   const backBase = wall + u(16);
   const inFront = backBase + u(36);
   let cursor = x0 + ROOM_DOOR(u);
+  const doorLeft = cursor;
   drawDoor(g, cursor, wall, { p, u, sign: false });
   if (season === 'halloween') pumpkin(cursor + doorWidth(p) + u(2), wall + u(26), env);
   cursor += doorWidth(p) + u(20);
@@ -1164,7 +1149,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   let at = winFrom + space;
   const bare = [{ x: winFrom + space / 2, w: space }];
   for (let i = 0; i < panes; i++) {
-    drawWindow(g, pane, at, wall, { p, u, skies });
+    drawWindow(g, pane, at, wall, { p, u, skies, season });
     at += paneW;
     bare.push({ x: at + space / 2, w: space });
     at += space;
@@ -1173,13 +1158,16 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   if (withClock && widest.w >= u(56)) clocks.push({ x: widest.x, y: top + Math.round(wallH * between(0.4, 0.55)) });
   // No bare wall wide enough: higher up, over the first bookshelf.
   else if (withClock) clocks.push({ x: firstShelf + (SHELF.w * p) / 2, y: top + Math.round(wallH * 0.28) });
-  // Now and then a small picture in another stretch of bare wall.
+  // Another stretch of bare wall for the season (a ghost, stockings), and
+  // now and then a small picture.
   const spare = bare.filter((b) => b !== widest && b.w >= u(60));
+  const seasonSpot = season && spare.length ? spare.splice(Math.floor(random() * spare.length), 1)[0] : null;
   if (spare.length && chance(0.3)) {
     const frame = pickOne(FRAMES);
     const at = pickOne(spare);
     drawSprite(g, frame, Math.round(at.x - (frame.w * p) / 2), Math.round(top + wallH * 0.38), p);
   }
+  seasonWall(g, env, { x0, x1, top, wall, door: { left: doorLeft, top: wall + u(4) - DOOR.h * p }, spot: seasonSpot });
 
   // Vertical plan: desk rows, then a middle band (meeting table, radio), then the
   // play area at the bottom. Rows are added while they fit; spare height is shared.
@@ -1298,6 +1286,10 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
     const at = freeSpot(TREE.w * p + GIFTS.w * p, TREE.h * p, wall + u(100), floorBottom - u(4), 200);
     if (at) christmasTree(at.left, at.base, env);
   }
+  seasonFloor(env, (s) => {
+    const at = freeSpot(s.w * p, s.h * p, wall + u(100), floorBottom - u(4), 100);
+    return at && { left: at.left, top: at.base - s.h * p };
+  });
 
   for (let i = int(2, 5) * sections; i > 0; i--) scatter(look.plant(), wall + u(80), floorBottom - u(4));
   if (chance(0.5)) scatter(CABINET, wall + floor * 0.5, floorBottom - u(4));
@@ -1611,10 +1603,12 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   const winW = pane.w * p;
   const gaps = []; // middle and width of each stretch of wall between groups
   let doorX = between(wallFrom + u(40), Math.max(wallFrom + u(40), wallTo - u(120)));
+  let sharedDoor = null;
   let wx = wallFrom + u(between(0, 40));
   while (wx + winW <= wallTo) {
     if (doorX !== null && wx + winW > doorX) {
       const doorLeft = wx + u(20);
+      sharedDoor = doorLeft;
       drawDoor(g, doorLeft, wall, { p, u });
       if (season === 'halloween') {
         pumpkin(doorLeft - u(8) - PUMPKIN.w * p, wall + u(26), env);
@@ -1626,7 +1620,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
       continue;
     }
     const n = Math.min(int(1, 3), Math.floor((wallTo - wx + u(8)) / (winW + u(8))));
-    for (let k = 0; k < n; k++) drawWindow(g, pane, wx + k * (winW + u(8)), wall, { p, u, skies });
+    for (let k = 0; k < n; k++) drawWindow(g, pane, wx + k * (winW + u(8)), wall, { p, u, skies, season });
     wx += n * (winW + u(8));
     const gap = u(between(50, 180));
     gaps.push({ x: wx + gap / 2, w: gap });
@@ -1636,12 +1630,26 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   const mid = (wallFrom + wallTo) / 2;
   const clockGap = gaps.reduce((best, gp) => (!best || Math.abs(gp.x - mid) < Math.abs(best.x - mid) ? gp : best), null);
   clocks.push({ x: clockGap ? clockGap.x : mid, y: top + Math.round(wallH * 0.45) });
+  const bareGaps = [];
   for (const gp of gaps) {
     if (gp === clockGap || gp.x + gp.w / 2 > wallTo) continue;
     const piece = pickOne([PAINTING, look.board(), null, null, null]);
-    if (!piece || piece.w * p + u(16) > gp.w) continue;
+    if (!piece || piece.w * p + u(16) > gp.w) {
+      bareGaps.push(gp);
+      continue;
+    }
     const pieceTop = piece === PAINTING ? wall - u(90) : wall - u(18) - piece.h * p;
     drawSprite(g, piece, gp.x - (piece.w * p) / 2, pieceTop, p);
+  }
+  const seasonSpot = bareGaps.filter((gp) => gp.w >= u(70)).sort((a, b) => b.w - a.w)[0] ?? null;
+  seasonWall(g, env, { x0, x1, top, wall, door: sharedDoor === null ? null : { left: sharedDoor, top: wall + u(4) - DOOR.h * p }, spot: seasonSpot });
+  // On the floor by the door, clear of the pumpkins or the tree.
+  if (sharedDoor !== null) {
+    const spots = [sharedDoor - u(150), sharedDoor + doorWidth(p) + u(150)];
+    seasonFloor(env, (s) => {
+      const left = spots.shift();
+      return left === undefined ? null : { left, top: wall + u(44) - s.h * p };
+    });
   }
 
   // ---- Front walkway, framed by two tall plants.
@@ -1747,7 +1755,8 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   const lamps = [];
   const glows = []; // small lights redrawn over the night tint
   const plates = []; // room names, drawn over everything else
-  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates, salt };
+  const walls = []; // garlands, redrawn each frame over the window skies
+  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates, salt, walls };
   // Seeds come from the session names; a salt gives the same names another layout.
   const seedOf = (i) => `${salt}${names[i] ?? ''}`;
   const zones = [];
@@ -1907,11 +1916,13 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     shared: layout === 'shared',
     props,
     overlay(ctx, date, weather = 'clear') {
-      for (const clock of clocks) drawClock(ctx, clock, date, u);
       const light = daylight(date);
-      if (light.night || light.dusk || weather !== 'clear') {
+      if (light.night || light.dusk || light.dawn || weather !== 'clear') {
         skies.forEach((w, i) => drawSky(ctx, w, i, light, px, weather, date.getTime()));
       }
+      const now = performance.now();
+      for (const draw of walls) draw(ctx, now);
+      for (const clock of clocks) drawClock(ctx, clock, date, u);
     },
     labels(ctx) {
       ctx.save();
@@ -1921,9 +1932,13 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     // Drawn over everything: the evening dims the office, lamps light up around
     // them. Returns how dark it is, so labels can switch to a light ink.
     shade(ctx, date, width, h) {
-      const { night, dusk } = daylight(date);
+      const { night, dusk, dawn } = daylight(date);
       if (dusk) {
         ctx.fillStyle = `rgb(242 140 60 / ${0.08 * dusk})`;
+        ctx.fillRect(0, 0, width, h);
+      }
+      if (dawn) {
+        ctx.fillStyle = `rgb(255 150 140 / ${0.14 * dawn})`;
         ctx.fillRect(0, 0, width, h);
       }
       if (!night) return 0;
@@ -1962,17 +1977,22 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   };
 }
 
-// How dark it is from the local hour: night 0 by day, 1 from 21:00 to 6:00, with
-// an hour-long ramp around; dusk peaks at sunset and sunrise.
+// How dark it is, from the real sunrise and sunset of the day: night is 0 by
+// day and 1 at night, ramping from an hour before sunset to an hour and a half
+// after, and from an hour and a half before sunrise to an hour after, so both
+// are half lit; dusk peaks at sunset, dawn at sunrise.
 export function daylight(date) {
   const h = date.getHours() + date.getMinutes() / 60;
-  const night = h >= 21 || h < 6 ? 1 : h >= 18 ? (h - 18) / 3 : h < 8 ? (8 - h) / 2 : 0;
+  const { sunrise, sunset } = sunTimes(date);
+  const ramp = (from, to) => Math.min(1, Math.max(0, (h - from) / (to - from)));
+  const night = h >= sunset - 1 ? ramp(sunset - 1, sunset + 1.5) : 1 - ramp(sunrise - 1.5, sunrise + 1);
   const peak = (at, width) => Math.max(0, 1 - Math.abs(h - at) / width);
-  return { night, dusk: Math.max(peak(19.5, 1.5), peak(6.5, 1)) };
+  return { night, dusk: peak(sunset, 1.5), dawn: peak(sunrise, 1.2) };
 }
 
 const DAY_SKY = [191, 224, 255];
 const DUSK_SKY = [244, 170, 120];
+const DAWN_SKY = [250, 196, 186]; // pinker and paler than the evening
 const NIGHT_SKY = [31, 42, 77];
 
 // Paints the glass of a window with the sky of the hour, stars at night.
@@ -1980,13 +2000,13 @@ const NIGHT_SKY = [31, 42, 77];
 const OVERCAST = { clear: 0, cloudy: 0.45, fog: 0.75, rain: 0.6, snow: 0.55, storm: 0.75 };
 const OVERCAST_GREY = { fog: [214, 218, 222], storm: [112, 120, 134] };
 
-function drawSky(ctx, { left, top, model }, index, { night, dusk }, p, weather, ms) {
+function drawSky(ctx, { left, top, model }, index, { night, dusk, dawn }, p, weather, ms) {
   const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
   const cell = (x, y) => ctx.fillRect(left + x * p, top + y * p, p, p);
   // The sky turns dark later than the room, so sunset stays orange.
   const darkness = Math.max(0, (night - 0.3) / 0.7);
   const grey = mix(OVERCAST_GREY[weather] ?? [178, 186, 196], NIGHT_SKY, darkness * 0.8);
-  const [r, g, b] = mix(mix(mix(DAY_SKY, DUSK_SKY, dusk), NIGHT_SKY, darkness), grey, OVERCAST[weather]);
+  const [r, g, b] = mix(mix(mix(mix(DAY_SKY, DUSK_SKY, dusk), DAWN_SKY, dawn), NIGHT_SKY, darkness), grey, OVERCAST[weather]);
   // A storm flashes now and then.
   const flash = weather === 'storm' && ms % 7000 < 140;
   ctx.fillStyle = flash ? '#f4f7ff' : `rgb(${r} ${g} ${b})`;

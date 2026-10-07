@@ -41,17 +41,23 @@ porte les réglages, gardés dans le navigateur :
 - Taille des pixels : de 1 à 6 px, décor compris. Les subagents ont un pixel de moins (à 1 px, la
   même taille).
 
-L'open space suit l'heure locale : ciel orangé au coucher du soleil, nuit étoilée dans les fenêtres
-et lampes allumées de 21 h à 6 h. La nuit, un Clawd qui travaille allume sa lumière : lampe de bureau ou
-rétroéclairage de l'écran selon le bureau, lampe sur pied près de la bibliothèque et du tableau
-blanc. Elle s'éteint quand il s'en va. Après 20 h, les Clawd au repos s'endorment au bout de 30 s au lieu
-de 2 minutes. Pour voir la nuit en plein jour, ouvrir `/?heure=22`.
+L'open space suit les vraies heures de lever et de coucher du soleil à Luxembourg, calculées pour le
+jour (`public/sun.js`) : lumière rosée au lever, ciel orangé au coucher, nuit étoilée dans les
+fenêtres et lampes allumées la nuit. La nuit, un Clawd qui travaille allume sa lumière : lampe de
+bureau ou rétroéclairage de l'écran selon le bureau, lampe sur pied près de la bibliothèque et du
+tableau blanc. Elle s'éteint quand il s'en va. Une fois la nuit tombée, les Clawd au repos
+s'endorment au bout de 30 s au lieu de 2 minutes. Pour voir la nuit en plein jour, ouvrir
+`/?heure=22` ; la Démo a des boutons Lever, Jour, Coucher et Nuit réglés sur les heures du jour.
 
 Les fenêtres montrent la météo du moment à Luxembourg (Open-Meteo, sans clé, rafraîchie toutes les
 30 min) : nuages, brouillard, pluie, neige, orage avec éclairs. Pour en forcer une :
 `/?meteo=pluie` (ou `soleil`, `nuages`, `brouillard`, `neige`, `orage`). Coordonnées dans
-`public/weather.js`. En octobre, des citrouilles s'allument la nuit ; de décembre à l'Épiphanie, un
-sapin clignote près de la porte. `/?saison=halloween` ou `/?saison=noel` pour les voir hors saison.
+`public/weather.js`. En octobre, Halloween : guirlande de fanions et de chauves-souris, toiles
+d'araignée, fantôme suspendu, chaudron, citrouilles qui s'allument la nuit. De décembre à
+l'Épiphanie, Noël : guirlande lumineuse, couronne sur la porte, chaussettes, neige sur les rebords
+des fenêtres, poinsettias et sapin clignotant. Environ deux Clawd sur cinq se déguisent (chapeau de
+sorcière, cornes, fantôme, momie ; bonnet de Père Noël ou d'elfe, bois de renne, pull de Noël).
+`/?saison=halloween` ou `/?saison=noel` pour les voir hors saison (ou le menu de la Démo).
 
 Un outil qui échoue (`PostToolUseFailure`, hors annulation) fait sursauter son Clawd sous une croix
 rouge. Après 10 min de travail d'affilée, un Clawd au clavier bâille et s'étire de temps en temps, et
@@ -73,6 +79,8 @@ clair. Le hook est déclaré `async`, il ne bloque jamais Claude : sortie vide, 
 - `public/live.js` : la scène plein écran (vues Live et Démo), `public/gallery.js` : la galerie.
 - `public/weather.js` : la météo affichée aux fenêtres.
 - `public/demo.js` : les sessions inventées de la Démo et sa barre de réglages.
+- `public/seasons.js` : les décorations de saison ; `public/costumes.js` : les déguisements.
+- `public/sun.js` : lever et coucher du soleil ; `public/pixels.js` : les sprites du décor.
 - `public/decor.js` : le registre des décors ; un décor fournit le fond, une zone par session avec ses
   postes, les meubles triés en profondeur avec les Clawd et un calque redessiné à chaque image.
 - `public/office.js` : le décor open space (salles ou bureau partagé, aménagement tiré au hasard par

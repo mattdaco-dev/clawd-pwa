@@ -1,8 +1,9 @@
 import { ANIMS, BALL, FRAME_H, FRAME_W, PASS } from './sprites.js';
-import { PALETTES, cycleDone, drawFrame, fitCanvas, frameIndex } from './render.js';
+import { PALETTES, cycleDone, fitCanvas, frameIndex } from './render.js';
 import { DECORS, DEFAULT_SETTINGS } from './decor.js';
-import { drawLight, seasonOf } from './office.js';
+import { daylight, drawLight, seasonOf } from './office.js';
 import { currentWeather } from './weather.js';
+import { costumeFor, drawDressed } from './costumes.js';
 
 // Subagents are drawn one pixel size smaller than their main agent (at 1, both are 1).
 const scaleFor = (kind, px) => (kind === 'main' ? px : Math.max(1, px - 1));
@@ -12,7 +13,7 @@ const HALF_BODY = 10; // body half-width in sprite pixels, arms included
 const WALK_SPEED = 7; // sprite pixels per second, at least
 const MAX_TRIP = 3; // seconds; long trips walk faster
 const SLEEP_AFTER = 120_000;
-const SLEEP_AFTER_NIGHT = 30_000; // from 20:00 to 7:00
+const SLEEP_AFTER_NIGHT = 30_000; // once night has mostly fallen, by the real sunset
 
 // The scene's clock: local time, or a fixed hour from `?heure=22` (or the demo
 // bar) to try the night. Fractions of an hour are minutes: 19.5 is 19:30.
@@ -25,8 +26,7 @@ function sceneDate(hour = forcedHour) {
 }
 
 function sleepAfter() {
-  const h = sceneDate().getHours();
-  return h >= 20 || h < 7 ? SLEEP_AFTER_NIGHT : SLEEP_AFTER;
+  return daylight(sceneDate()).night > 0.5 ? SLEEP_AFTER_NIGHT : SLEEP_AFTER;
 }
 
 // Where each state happens in the office, and what is played once there.
@@ -326,7 +326,7 @@ class Critter {
       ctx.fill();
     }
     const left = Math.round(this.x - CENTER * this.scale);
-    drawFrame(ctx, frame, left, y - FEET * this.scale, this.scale, PALETTES[this.kind], this.dir < 0);
+    drawDressed(ctx, frame, left, y - FEET * this.scale, this.scale, PALETTES[this.kind], this.dir < 0, this.costume);
   }
 }
 
@@ -809,6 +809,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
   // Overrides from the demo bar: a fixed hour, weather or season ('auto' keeps
   // the real one) and a salt that redraws the decor.
   let view = { hour: forcedHour, weather: 'auto', season: 'auto', salt: '' };
+  let season = null; // the decor's, which the costumes follow
 
   function resize() {
     width = stage.clientWidth;
@@ -830,7 +831,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
   function ensureOffice(sessions) {
     const names = sessions.map((s) => s.name || s.id.slice(0, 8));
     const { decor, layout, px } = settings;
-    const season = view.season === 'auto' ? seasonOf(sceneDate(view.hour)) : view.season;
+    season = view.season === 'auto' ? seasonOf(sceneDate(view.hour)) : view.season;
     const key = `${decor}|${layout}|${px}|${season}|${view.salt}|${width}x${viewHeight}|${names.join('|')}`;
     if (key === officeKey) return;
     officeKey = key;
@@ -905,6 +906,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       }
       critter.label = agent.label;
       critter.zone = zone;
+      critter.costume = costumeFor(agent.key, season);
       critter.update(now, dt, agent, zone);
     }
 
