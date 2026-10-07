@@ -360,6 +360,60 @@ function drawDoor(g, left, wall, { p, u, sign = true }) {
   g.fillRect(Math.round(left - u(6)), Math.round(wall + u(6)), Math.round(DOOR.w * p + u(12)), Math.round(u(9)));
 }
 
+// A fireplace built into the wall: stone surround, wooden mantel, logs. The
+// fire is drawn on top while it is lit: autumn evenings, and all winter.
+const FIREPLACE = sprite([
+  'DDDDDDDDDDDDDDDDDD',
+  '.HHHHHHHHHHHHHHHH.',
+  '.AGAAGAAGAAGAAGAA.',
+  '.AAAAAAAAAAAAAAAA.',
+  '.AGAKKKKKKKKKKAGA.',
+  '.AAKKKKKKKKKKKKAA.',
+  '.GAKKKKKKKKKKKKGA.',
+  '.AAKKKKKKKKKKKKAA.',
+  '.AGKKKKKKKKKKKKAG.',
+  '.AAKKKKKKKKKKKKAA.',
+  '.GAKKKKKKKKKKKKGA.',
+  '.AAKKHHHHHHHHKKAA.',
+  '.AGKHHDHHDHHHHKAG.',
+  'GGGGGGGGGGGGGGGGGG',
+]);
+// The season of the year each feast falls in, for the fire.
+const FEAST_SEASON = {
+  noel: 'hiver', 'nouvel-an': 'hiver', buergbrennen: 'hiver', fuesend: 'hiver',
+  kleeschen: 'automne', halloween: 'automne', 'fete-de': 'automne',
+  paques: 'printemps', 'fete-lu': 'ete', 'fete-fr': 'ete', 'fete-be': 'ete', fouer: 'ete',
+};
+const fireLit = (season, light) => {
+  const year = FEAST_SEASON[season] ?? season;
+  return year === 'hiver' || (year === 'automne' && (light.dusk > 0 || light.night > 0.3));
+};
+
+function fireplace(g, left, wall, env) {
+  const { p, u } = env;
+  const top = Math.round(wall + u(4) - FIREPLACE.h * p);
+  left = Math.round(left);
+  drawSprite(g, FIREPLACE, left, top, p);
+  const state = { lit: false };
+  // Flames over the logs, every column flickering at its own pace.
+  const flames = (ctx, now) => {
+    if (!state.lit) return;
+    for (let c = 4; c <= 13; c++) {
+      const h = 2 + Math.floor(3 * Math.abs(Math.sin(now / 170 + c * 1.7)) + (c > 6 && c < 11 ? 1 : 0));
+      for (let k = 0; k < h; k++) {
+        ctx.fillStyle = k >= h - 1 ? INK.Y : k >= h - 2 ? INK.o : INK.R;
+        ctx.fillRect(left + c * p, top + (11 - k) * p, p, p);
+      }
+    }
+  };
+  env.walls.push((ctx, now, light) => {
+    state.lit = fireLit(env.season, light);
+    flames(ctx, now);
+  });
+  env.glows.push({ x: left + 9 * p, y: top + 9 * p, r: 24, draw: flames });
+  return FIREPLACE.w * p;
+}
+
 // Ambiances: a wall, a floor and the fabrics, rug colours and pots that go
 // with them. Each room draws one; everything in the room follows it.
 const THEMES = [
@@ -1146,7 +1200,11 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   drawDoor(g, cursor, wall, { p, u, sign: false });
   if (season === 'halloween') pumpkin(cursor + doorWidth(p) + u(2), wall + u(26), env);
   cursor += doorWidth(p) + u(20);
-  const shelfCount = int(1, W >= u(900) ? 3 : W >= u(560) ? 2 : 1);
+  let shelfCount = int(1, W >= u(900) ? 3 : W >= u(560) ? 2 : 1);
+  // Room for the fireplace between the whiteboard and the coffee corner: one
+  // bookcase fewer if that is what it takes (there is always one left).
+  const wallNeeds = (n) => cursor + n * (SHELF.w * p + u(16)) + u(60) + BOARD.w * p + u(40) + FIREPLACE.w * p + u(10);
+  while (shelfCount > 1 && wallNeeds(shelfCount) > x1 - u(58) - COUNTER.w * p) shelfCount--;
   const firstShelf = cursor;
   for (let i = 0; i < shelfCount; i++) {
     standing(look.shelf(), cursor, backBase);
@@ -1164,7 +1222,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   slot('board', boardLeft + u(120), wall + u(44), 0, { light: reading });
 
   // Along the wall, right: coffee corner, maybe a plant if a window still fits.
-  const winFrom = boardLeft + BOARD.w * p + u(40);
+  let winFrom = boardLeft + BOARD.w * p + u(40);
   let right = x1 - u(28) - COUNTER.w * p;
   coffeeCorner(right, backBase, inFront, { g, ceiling: top, lamps, p, u, standing, slot, stations });
   const plant = chance(0.3) ? look.plant() : null;
@@ -1177,6 +1235,8 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   reserve(x0, wall, W, u(60));
 
   const winTo = right - u(30);
+  // The fireplace, after the whiteboard, even if it takes the windows' place.
+  if (winTo - winFrom >= FIREPLACE.w * p + u(10)) winFrom += fireplace(g, winFrom, wall, env) + u(30);
   // As many windows as fit, of one shape, evenly spaced; the clock in the
   // widest stretch of bare wall left.
   const span = winTo - winFrom;
@@ -1644,7 +1704,10 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   // ---- Wall over the plateau: windows in groups of one to three, with
   // wall pieces in between (a painting, a pin board, the clock) or bare wall.
   const wallFrom = shelfStart + shelves * (SHELF.w * p + u(4)) + u(30);
-  const wallTo = kitchen - u(60) - PAINTING.w * p;
+  // The fireplace closes the wall on the lounge side, before the kitchen.
+  const fireLeft = kitchen - u(60) - PAINTING.w * p - FIREPLACE.w * p;
+  fireplace(g, fireLeft, wall, env);
+  const wallTo = fireLeft - u(30);
   const pane = windowModel(random);
   const winW = pane.w * p;
   const gaps = []; // middle and width of each stretch of wall between groups
@@ -1970,7 +2033,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
         skies.forEach((w, i) => drawSky(ctx, w, i, light, px, weather, date.getTime()));
       }
       const now = performance.now();
-      for (const draw of walls) draw(ctx, now);
+      for (const draw of walls) draw(ctx, now, light);
       for (const clock of clocks) drawClock(ctx, clock, date, u);
     },
     labels(ctx) {

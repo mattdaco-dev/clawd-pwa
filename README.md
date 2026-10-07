@@ -82,6 +82,10 @@ fromage, frites et gaufre, bretzel et bière. Entre les fêtes, la saison de l'a
 automne (feuilles mortes, Quetschentaart, écharpes, bérets), hiver (neige aux rebords, chocolat chaud,
 bonnets, écharpes, cache-oreilles). `?saison=printemps` (ou `ete`, `automne`, `hiver`).
 
+Une cheminée est encastrée dans le mur (après le tableau blanc dans les salles, côté salon dans
+l'open space partagé). Le feu s'allume le soir en automne et toute la journée en hiver ; les fêtes
+suivent la saison où elles tombent (Noël, Nouvel An, Fuesend, Buergbrennen : hiver).
+
 Un outil qui échoue (`PostToolUseFailure`, hors annulation) fait sursauter son Clawd sous une croix
 rouge. Après 10 min de travail d'affilée, un Clawd au clavier bâille et s'étire de temps en temps, et
 toutes les 30 min il part prendre un café. Pendant une compaction du contexte (`PreCompact` à
