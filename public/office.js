@@ -205,11 +205,36 @@ const GIFTS = sprite([
   'RRYRRBBYBB',
 ]);
 
+// Easter Sunday (anonymous Gregorian algorithm).
+function easter(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const h = (19 * a + b - Math.floor(b / 4) - Math.floor((b - Math.floor((8 * b + 13) / 25)) / 3) + 15) % 30;
+  const l = (32 + 2 * (b % 4) + 2 * Math.floor(c / 4) - h - (c % 4)) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  return new Date(year, month - 1, ((h + l - 7 * m + 114) % 31) + 1);
+}
+
+// The Schueberfouer opens on the Friday closest to 24 August and lasts 20 days.
+function fouerStart(year) {
+  const st = new Date(year, 7, 24);
+  const back = (st.getDay() + 2) % 7; // days since the last Friday
+  return new Date(year, 7, 24 + (back <= 3 ? -back : 7 - back));
+}
+
 export function seasonOf(date) {
   const forced = new URLSearchParams(location.search).get('saison');
   if (forced) return forced;
   const m = date.getMonth();
   const d = date.getDate();
+  const day = new Date(date.getFullYear(), m, d);
+  const days = (from, to) => (to - from) / 86_400_000;
+  const sinceEaster = days(easter(date.getFullYear()), day);
+  if (sinceEaster >= -10 && sinceEaster <= 1) return 'paques'; // to Easter Monday, the Emaischen
+  const sinceFouer = days(fouerStart(date.getFullYear()), day);
+  if (sinceFouer >= 0 && sinceFouer < 20) return 'fouer';
   if (m === 9 || (m === 10 && d <= 2)) return 'halloween';
   if (m === 11 || (m === 0 && d <= 6)) return 'noel';
   return null;
@@ -1645,7 +1670,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   seasonWall(g, env, { x0, x1, top, wall, door: sharedDoor === null ? null : { left: sharedDoor, top: wall + u(4) - DOOR.h * p }, spot: seasonSpot });
   // On the floor by the door, clear of the pumpkins or the tree.
   if (sharedDoor !== null) {
-    const spots = [sharedDoor - u(150), sharedDoor + doorWidth(p) + u(150)];
+    const spots = [150, 215, 280, 345].flatMap((d) => [sharedDoor - u(d), sharedDoor + doorWidth(p) + u(d)]);
     seasonFloor(env, (s) => {
       const left = spots.shift();
       return left === undefined ? null : { left, top: wall + u(44) - s.h * p };

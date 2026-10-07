@@ -71,6 +71,54 @@ const COSTUMES = {
       '..H.......H..',
     ]),
   },
+  bunny: {
+    season: 'paques',
+    hat: hat([
+      '.WW...WW.',
+      '.WqW.WqW.',
+      '.WqW.WqW.',
+      '.WqW.WqW.',
+      '..WW.WW..',
+    ]),
+  },
+  chick: { season: 'paques', body: () => '#f4d24a' },
+  flowers: {
+    season: 'paques',
+    hat: hat([
+      '.q.y.b.q.y.',
+      'qPyPbPqPyPl',
+    ]),
+  },
+  partyHat: {
+    season: 'fouer',
+    hat: hat([
+      '...Y...',
+      '...R...',
+      '..RWR..',
+      '..WRW..',
+      '.RWRWR.',
+      '.WRWRW.',
+    ]),
+  },
+  boater: {
+    season: 'fouer',
+    hat: hat([
+      '..YYYYYYY..',
+      '..RRRRRRR..',
+      'YYYYYYYYYYY',
+    ]),
+  },
+  // A balloon on a string, tied to the head.
+  balloon: {
+    season: 'fouer',
+    hat: (a) => {
+      const cells = [];
+      const bx = a.right - a.cx + 3;
+      for (let y = -4; y < 0; y++) cells.push([bx, y, 'K']);
+      for (const [x, y] of [[0, -9], [1, -9], [-1, -8], [0, -8], [1, -8], [2, -8], [-1, -7], [0, -7], [1, -7], [2, -7], [-1, -6], [0, -6], [1, -6], [2, -6], [0, -5], [1, -5]]) cells.push([bx + x - 1, y, 'c']);
+      return cells;
+    },
+  },
   // A Christmas jumper: red, with a band of green and white below the eyes.
   jumper: {
     season: 'noel',

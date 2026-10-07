@@ -55,9 +55,14 @@ Les fenêtres montrent la météo du moment à Luxembourg (Open-Meteo, sans clé
 `public/weather.js`. En octobre, Halloween : guirlande de fanions et de chauves-souris, toiles
 d'araignée, fantôme suspendu, chaudron, citrouilles qui s'allument la nuit. De décembre à
 l'Épiphanie, Noël : guirlande lumineuse, couronne sur la porte, chaussettes, neige sur les rebords
-des fenêtres, poinsettias et sapin clignotant. Environ deux Clawd sur cinq se déguisent (chapeau de
-sorcière, cornes, fantôme, momie ; bonnet de Père Noël ou d'elfe, bois de renne, pull de Noël).
-`/?saison=halloween` ou `/?saison=noel` pour les voir hors saison (ou le menu de la Démo).
+des fenêtres, poinsettias et sapin clignotant. À Pâques (des dix jours avant le dimanche jusqu'à
+l'Emaischen) : guirlande pastel, œufs suspendus, chasse aux œufs, panier et lapin en chocolat.
+Pendant la Schueberfouer (20 jours à partir du vendredi le plus proche du 24 août) : ampoules de
+fête foraine sous des fanions aux couleurs du drapeau, affiche de la grande roue, ballons, nounours.
+Environ deux Clawd sur cinq se déguisent selon la saison : chapeau de sorcière, cornes, fantôme,
+momie ; bonnet de Père Noël ou d'elfe, bois de renne, pull de Noël ; oreilles de lapin, poussin,
+couronne de fleurs ; chapeau de fête, canotier, ballon. `/?saison=paques` (ou `fouer`,
+`halloween`, `noel`) pour les voir hors saison, ou le menu de la Démo.
 
 Un outil qui échoue (`PostToolUseFailure`, hors annulation) fait sursauter son Clawd sous une croix
 rouge. Après 10 min de travail d'affilée, un Clawd au clavier bâille et s'étire de temps en temps, et

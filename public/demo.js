@@ -121,7 +121,7 @@ function hourOf(moment) {
 }
 const clock = (h) => `${Math.floor(h)}h${String(Math.round((h % 1) * 60) % 60).padStart(2, '0')}`;
 const WEATHERS = { auto: 'Réelle', clear: 'Soleil', cloudy: 'Nuages', fog: 'Brouillard', rain: 'Pluie', snow: 'Neige', storm: 'Orage' };
-const SEASONS = { auto: 'Du moment', none: 'Aucune', halloween: 'Halloween', noel: 'Noël' };
+const SEASONS = { auto: 'Du moment', none: 'Aucune', paques: 'Pâques', fouer: 'Schueberfouer', halloween: 'Halloween', noel: 'Noël' };
 
 const options = (map, current) => Object.entries(map)
   .map(([value, label]) => `<option value="${value}"${String(current) === value ? ' selected' : ''}>${label}</option>`)

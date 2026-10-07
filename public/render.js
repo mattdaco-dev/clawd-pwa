@@ -38,6 +38,12 @@ const INKS = {
   // Halloween purple, Christmas greenery
   v: '#6e4a9e',
   g: '#2f6b3a',
+  // Easter pastels, and the light blue of the Luxembourg flag
+  q: '#f4b6c8',
+  y: '#f6e08a',
+  b: '#a9cdee',
+  l: '#b5dfa6',
+  c: '#00a1de',
 };
 
 function lighten(hex, amount) {
