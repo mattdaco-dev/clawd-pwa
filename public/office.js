@@ -105,11 +105,52 @@ function coffeeCorner(left, base, inFront, { g, ceiling, lamps, p, u, standing, 
   g.fillStyle = INK.K;
   g.fillRect(Math.round(cx - p / 2), ceiling, p, Math.round(shadeTop - ceiling));
   drawSprite(g, PENDANT, cx - 3.5 * p, shadeTop, p);
-  lamps.push({ x: cx, y: base - COUNTER.h * p }); // glow centred on the worktop
+  lamps.push({ x: cx, y: base - COUNTER.h * p, box: { x: cx - 3.5 * p, y: shadeTop, w: 7 * p, h: 4 * p } }); // glow centred on the worktop
   slot('coffee', left + COUNTER_MACHINE * p, inFront);
   // Centred on the machine, so the one on the right still fits by the wall's end.
   slot('chat', left + COUNTER_MACHINE * p, inFront + u(6));
   stations.chat.at(-1).near = stations.coffee.at(-1);
+}
+
+// The cat's corner: water and kibble on a little mat, and a basket with a cushion.
+const CAT_BOWLS = sprite([
+  '.BSSSSB..RHDHDR.',
+  '.BBBBBB..RRRRRR.',
+  'AABBBBAAAARRRRAA',
+]);
+const CAT_BED_ROWS = [
+  '..HHHHHHHHHHHH..',
+  '.HDqqqqqqqqqqDH.',
+  'HDqqqqqqqqqqqqDH',
+  'HHHHHHHHHHHHHHHH',
+  'HDHDHDHDHDHDHDHH',
+  '.HHHHHHHHHHHHHH.',
+];
+// Its front rim is drawn apart, over the cat curled up inside.
+const CAT_BED = sprite(CAT_BED_ROWS);
+const CAT_BED_BACK = sprite(CAT_BED_ROWS.slice(0, 3));
+const CAT_BED_FRONT = sprite(CAT_BED_ROWS.slice(3));
+
+// Puts the cat's bowls and basket where `place(sprite)` finds room ({ left, base }).
+// Returns where the cat eats (facing right, its nose over the water) and sleeps.
+function catCorner(env, place) {
+  const { p, props } = env;
+  const corner = {};
+  const bowls = place(CAT_BOWLS);
+  if (bowls) {
+    props.push({ base: Math.round(bowls.base), draw: (ctx) => drawSprite(ctx, CAT_BOWLS, bowls.left, bowls.base - CAT_BOWLS.h * p, p) });
+    corner.catBowls = { x: bowls.left - 3.5 * p, y: Math.round(bowls.base) + 1 };
+  }
+  const bed = place(CAT_BED);
+  if (bed) {
+    const top = bed.base - CAT_BED.h * p;
+    const base = Math.round(bed.base);
+    props.push({ base: base - 1, draw: (ctx) => drawSprite(ctx, CAT_BED_BACK, bed.left, top, p) });
+    props.push({ base: base + 1, draw: (ctx) => drawSprite(ctx, CAT_BED_FRONT, bed.left, top + 3 * p, p) });
+    // The cat lies on the cushion, its belly hidden by the front rim; drawn between the two.
+    corner.catBed = { x: bed.left + (CAT_BED.w * p) / 2, y: top + 5 * p, base, front: { x: bed.left + (CAT_BED.w * p) / 2, y: base + 4 * p } };
+  }
+  return corner;
 }
 
 const RADIO = sprite([
@@ -251,13 +292,15 @@ export function seasonOf(date) {
 function pumpkin(left, base, { p, props, glows }) {
   const top = base - PUMPKIN.h * p;
   props.push({ base: Math.round(base), draw: (ctx) => drawSprite(ctx, PUMPKIN, left, top, p) });
-  glows.push({ cells: PUMPKIN_FACE, left, top, p, x: left + 3.5 * p, y: top + 4 * p, r: 10 });
+  glows.push({ cells: PUMPKIN_FACE, left, top, p, x: left + 3.5 * p, y: top + 4 * p, r: 10, box: { x: left, y: top, w: PUMPKIN.w * p, h: PUMPKIN.h * p } });
 }
 
 function christmasTree(left, base, env, g) {
   const { p, props, glows } = env;
   const top = base - TREE.h * p;
+  const glow = { x: left + 5.5 * p, y: top + 9 * p, r: 16, box: { x: left, y: top, w: TREE.w * p, h: TREE.h * p } };
   const lights = (ctx, now) => {
+    if (glow.force === false) return; // switched off by a click
     const step = Math.floor(now / 600);
     TREE_LIGHTS.forEach(([x, y, c], i) => {
       if ((i + step) % 3 === 0) return; // a third of them off at a time
@@ -272,7 +315,8 @@ function christmasTree(left, base, env, g) {
       lights(ctx, performance.now());
     },
   });
-  glows.push({ draw: lights, x: left + 5.5 * p, y: top + 9 * p, r: 16 });
+  glow.draw = lights;
+  glows.push(glow);
   // Presents: a big stack beside the tree, a smaller one in front of its trunk.
   const [big, small] = TREE_GIFTS;
   const giftsLeft = left + TREE.w * p - 2 * p;
@@ -395,9 +439,10 @@ function fireplace(g, left, wall, env) {
   left = Math.round(left);
   drawSprite(g, FIREPLACE, left, top, p);
   const state = { lit: false };
+  const glow = { x: left + 9 * p, y: top + 9 * p, r: 24, isLit: () => state.lit, box: { x: left, y: top, w: FIREPLACE.w * p, h: FIREPLACE.h * p } };
   // Flames over the logs, every column flickering at its own pace.
   const flames = (ctx, now) => {
-    if (!state.lit) return;
+    if (!(glow.force ?? state.lit)) return;
     for (let c = 4; c <= 13; c++) {
       const h = 2 + Math.floor(3 * Math.abs(Math.sin(now / 170 + c * 1.7)) + (c > 6 && c < 11 ? 1 : 0));
       for (let k = 0; k < h; k++) {
@@ -410,7 +455,8 @@ function fireplace(g, left, wall, env) {
     state.lit = fireLit(env.season, light);
     flames(ctx, now);
   });
-  env.glows.push({ x: left + 9 * p, y: top + 9 * p, r: 24, draw: flames });
+  glow.draw = flames;
+  env.glows.push(glow);
   return FIREPLACE.w * p;
 }
 
@@ -1050,11 +1096,15 @@ const DESK_LAMP_LEFT = mirror(DESK_LAMP);
 // its position so the decor's random draws stay untouched.
 const lightKind = (x, y) => ((Math.round(x) * 7 + Math.round(y) * 13) % 5 < 2 ? 'lamp' : 'screen');
 
+// Where a click switches a light: the lamp itself, or the screen around its glow.
+const lampBox = (s, left, top, p) => ({ x: left, y: top, w: s.w * p, h: s.h * p });
+const screenBox = (x, y, p) => ({ x: x - 6 * p, y: y - 4 * p, w: 12 * p, h: 9 * p });
+
 // Front desk: the monitor's back is on the left (rows 0-4), the mug on the right.
 function frontDeskLight(left, top, p) {
   const kind = lightKind(left, top);
-  if (kind === 'lamp') return { kind, x: left + 22 * p, y: top + 1 * p, lamp: { s: DESK_LAMP, left: left + 21 * p, top: top + 1 * p }, p };
-  return { kind, x: left + 8 * p, y: top + 2.5 * p, p };
+  if (kind === 'lamp') return { kind, x: left + 22 * p, y: top + 1 * p, lamp: { s: DESK_LAMP, left: left + 21 * p, top: top + 1 * p }, p, box: lampBox(DESK_LAMP, left + 21 * p, top + 1 * p, p) };
+  return { kind, x: left + 8 * p, y: top + 2.5 * p, p, box: screenBox(left + 8 * p, top + 2.5 * p, p) };
 }
 
 // Side desk, Clawd on the left when side is 1: the screen at the far end faces it.
@@ -1063,9 +1113,9 @@ function sideDeskLight(left, top, p, side) {
   const col = (c) => left + (side > 0 ? c : SIDE_DESK.w - 1 - c) * p;
   if (kind === 'lamp') {
     const lampLeft = side > 0 ? col(4) : col(8);
-    return { kind, x: col(6), y: top + 2 * p, lamp: { s: side > 0 ? DESK_LAMP : DESK_LAMP_LEFT, left: lampLeft, top: top + 1 * p }, p };
+    return { kind, x: col(6), y: top + 2 * p, lamp: { s: side > 0 ? DESK_LAMP : DESK_LAMP_LEFT, left: lampLeft, top: top + 1 * p }, p, box: lampBox(DESK_LAMP, lampLeft, top + 1 * p, p) };
   }
-  return { kind, x: col(8) + p / 2, y: top + 2.5 * p, p };
+  return { kind, x: col(8) + p / 2, y: top + 2.5 * p, p, box: screenBox(col(8) + p / 2, top + 2.5 * p, p) };
 }
 
 // Floor lamp standing at (left, base), switched on by whoever reads or thinks nearby.
@@ -1073,7 +1123,31 @@ function sideDeskLight(left, top, p, side) {
 const LAMP_SHADE = { ...LAMP, cells: LAMP.cells.filter(([, y]) => y < 3) };
 function floorLamp(left, base, p) {
   const top = base - LAMP.h * p;
-  return { kind: 'floor', x: left + 3 * p, y: top + 1.5 * p, lamp: { s: LAMP_SHADE, left, top }, p };
+  return { kind: 'floor', x: left + 3 * p, y: top + 1.5 * p, lamp: { s: LAMP_SHADE, left, top }, p, box: lampBox(LAMP, left, top, p) };
+}
+
+// How bright a light shines, 0 when off. `auto` is whether it would be on by
+// itself (night, someone at work); a click forces it the other way until that
+// changes. Forced on by day, it still shows.
+const DAY_LIGHT = 0.55;
+export function lightLevel(item, auto, night) {
+  if (item.force != null && item.forceAuto !== auto) item.force = null;
+  item.auto = auto;
+  if (!(item.force ?? auto)) return 0;
+  return item.force ? Math.max(night, DAY_LIGHT) : night;
+}
+
+const switchAt = (switches, x, y, pad = 3) =>
+  switches.find(({ box: b }) => x >= b.x - pad && x <= b.x + b.w + pad && y >= b.y - pad && y <= b.y + b.h + pad);
+
+// A click on a lamp, a screen, a pumpkin...: switches it. False when nothing is there.
+function toggleAt(switches, x, y) {
+  const hit = switchAt(switches, x, y);
+  if (!hit) return false;
+  const on = hit.force ?? hit.auto ?? false;
+  hit.force = !on;
+  hit.forceAuto = hit.auto ?? false;
+  return true;
 }
 
 // Glow of a work light, drawn over the night tint so it stays bright.
@@ -1136,7 +1210,7 @@ const STATIONS = ['desk', 'shelf', 'board', 'coffee', 'chat', 'radio', 'beanbag'
 // Furnishes one area (a room, or the whole shared office) and returns its
 // walkable zone and stations. Every station type always exists; quantities and
 // positions vary with the seed, which keeps a layout stable across rebuilds.
-function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env) {
+function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows, catHome = false }, env) {
   const { p, u, props, clocks, skies, lamps, season } = env;
   const W = x1 - x0;
   const wallH = u(110);
@@ -1158,14 +1232,17 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   const stations = Object.fromEntries(STATIONS.map((type) => [type, []]));
   // perScale and dxPerScale shift the spot with the Clawd's size, so its hands
   // land on the same furniture whether it is a main agent or a subagent.
-  const slot = (type, x, y, perScale = 0, { dxPerScale = 0, dir = 1, anims, light } = {}) => stations[type].push({
-    type,
-    occupant: null,
-    dir,
-    anims,
-    light,
-    spot: (scale) => ({ x: Math.round(x + dxPerScale * scale), y: Math.round(y + perScale * scale) }),
-  });
+  const slot = (type, x, y, perScale = 0, { dxPerScale = 0, dir = 1, anims, light } = {}) => {
+    if (light && !env.workLights.includes(light)) env.workLights.push(light);
+    stations[type].push({
+      type,
+      occupant: null,
+      dir,
+      anims,
+      light,
+      spot: (scale) => ({ x: Math.round(x + dxPerScale * scale), y: Math.round(y + perScale * scale) }),
+    });
+  };
 
   // Floor footprints already used, so scattered items keep clear of furniture and stations.
   const taken = [];
@@ -1398,11 +1475,12 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   }, g, floorArea);
   seasonCritters(env, floorArea);
   wallSpiders(env, x0, x1, top, wall);
+  const cat = catHome ? catCorner(env, (s) => freeSpot(s.w * p, s.h * p, wall + u(100), floorBottom - u(4), 200)) : {};
 
   for (let i = int(2, 5) * sections; i > 0; i--) scatter(look.plant(), wall + u(80), floorBottom - u(4));
   if (chance(0.5)) scatter(CABINET, wall + floor * 0.5, floorBottom - u(4));
 
-  return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations, perches, door: { x: doorLeft + doorWidth(p) / 2, y: wall + u(24) } };
+  return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations, perches, door: { x: doorLeft + doorWidth(p) / 2, y: wall + u(24) }, ...cat };
 }
 
 
@@ -1427,14 +1505,17 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   paintArea(g, x0, top, W, bottom - top, wallH, u, theme);
 
   const stations = Object.fromEntries(STATIONS.map((type) => [type, []]));
-  const slot = (type, x, y, perScale = 0, { dxPerScale = 0, dir = 1, anims, light } = {}) => stations[type].push({
-    type,
-    occupant: null,
-    dir,
-    anims,
-    light,
-    spot: (scale) => ({ x: Math.round(x + dxPerScale * scale), y: Math.round(y + perScale * scale) }),
-  });
+  const slot = (type, x, y, perScale = 0, { dxPerScale = 0, dir = 1, anims, light } = {}) => {
+    if (light && !env.workLights.includes(light)) env.workLights.push(light);
+    stations[type].push({
+      type,
+      occupant: null,
+      dir,
+      anims,
+      light,
+      spot: (scale) => ({ x: Math.round(x + dxPerScale * scale), y: Math.round(y + perScale * scale) }),
+    });
+  };
   // `sortAt` overrides the depth used for sorting (seats are drawn behind who sits in them).
   const prop = (s, left, top, sortAt) => {
     props.push({ base: Math.round(sortAt ?? top + s.h * p), draw: (ctx) => drawSprite(ctx, s, left, top, p) });
@@ -1521,7 +1602,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   slot('shelf', x0 + u(60), readBase + u(34));
   seat(readingChair, x0 + u(158), readBase - readingChair.h * p, 'beanbag');
   standing(LAMP, x0 + u(195), readBase);
-  lamps.push({ x: x0 + u(195) + 3 * p, y: readBase - LAMP.h * p + 1.5 * p });
+  lamps.push({ x: x0 + u(195) + 3 * p, y: readBase - LAMP.h * p + 1.5 * p, box: lampBox(LAMP, x0 + u(195), readBase - LAMP.h * p, p) });
   if (lx1 - x0 >= u(360)) seat(readingChair, x0 + u(263), readBase - readingChair.h * p, 'beanbag');
 
   // Copy corner, low on the left: printer between filing cabinets.
@@ -1561,7 +1642,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   prop(sofa, loungeX - (sofa.w * p) / 2, sofaTop, sofaTop + 2 * p);
   for (const dx of [-u(30), u(30)]) slot('beanbag', loungeX + dx, sofaTop + sofa.seat * p);
   standing(LAMP, loungeX - (sofa.w * p) / 2 - u(40), sofaBase);
-  lamps.push({ x: loungeX - (sofa.w * p) / 2 - u(40) + 3 * p, y: sofaBase - LAMP.h * p + 1.5 * p });
+  lamps.push({ x: loungeX - (sofa.w * p) / 2 - u(40) + 3 * p, y: sofaBase - LAMP.h * p + 1.5 * p, box: lampBox(LAMP, loungeX - (sofa.w * p) / 2 - u(40), sofaBase - LAMP.h * p, p) });
   const radioLeft = loungeX + (sofa.w * p) / 2 + u(14);
   standing(RADIO, radioLeft, sofaBase);
   slot('radio', radioLeft + RADIO.w * p + u(40), sofaBase - u(4));
@@ -1776,10 +1857,16 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   const entrance = look.tallPlant(); // the same model on both sides
   standing(entrance, x0 + u(16), floorBottom - u(4));
   standing(entrance, x1 - u(16) - entrance.w * p, floorBottom - u(4));
+  // The cat's corner, by the plant on the right.
+  let catRight = x1 - u(36) - entrance.w * p;
+  const cat = catCorner(env, (s) => {
+    catRight -= s.w * p + u(16);
+    return { left: catRight + u(16), base: floorBottom - u(10) };
+  });
   const fronts = clamp(Math.floor(cw / u(110)), 3, 12);
   for (let i = 0; i < fronts; i++) slot('front', cx0 + (cw * (i + 0.5)) / fronts, floorBottom - u(2));
 
-  return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations, perches, door: sharedDoor === null ? null : { x: sharedDoor + doorWidth(p) / 2, y: wall + u(24) } };
+  return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations, perches, door: sharedDoor === null ? null : { x: sharedDoor + doorWidth(p) / 2, y: wall + u(24) }, ...cat };
 }
 
 // ---- Rooms joined into one floor plan
@@ -1877,7 +1964,9 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   const plates = []; // room names, drawn over everything else
   const walls = []; // garlands, redrawn each frame over the window skies
   const tables = []; // meeting and café tables, for the season's food
-  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates, salt, walls, tables };
+  const workLights = []; // desk lamps, screens and reading lamps, lit by whoever works there
+  const ghosts = []; // little ghosts a click frightens
+  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates, salt, walls, tables, workLights, ghosts };
   // Seeds come from the session names; a salt gives the same names another layout.
   const seedOf = (i) => `${salt}${names[i] ?? ''}`;
   const zones = [];
@@ -1887,7 +1976,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   if (layout === 'shared') {
     ({ canvas: background } = canvasFor(width, height));
     const g = background.getContext('2d');
-    const area = { x0: 0, x1: width, top: 0, bottom: height, name: '', seed: `${salt}shared`, maxPerRow: 8, maxRows: 4 };
+    const area = { x0: 0, x1: width, top: 0, bottom: height, name: '', seed: `${salt}shared`, maxPerRow: 8, maxRows: 4, catHome: true };
     // The designed plan needs room for its three zones; narrow windows keep the generic one.
     zones.push(width >= u(1300) && height >= u(700) ? furnishShared(g, area, env) : furnish(g, area, env));
   } else {
@@ -1982,7 +2071,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     frame(px, WALL_EDGE);
     for (const room of rooms) {
       const { x0, x1, top, bottom, i } = room;
-      zones[i] = furnish(g, { x0, x1, top, bottom, name: names[i] ?? '', seed: `${seedOf(i)}#${i}`, maxPerRow: 3, maxRows: 2 }, env);
+      zones[i] = furnish(g, { x0, x1, top, bottom, name: names[i] ?? '', seed: `${seedOf(i)}#${i}`, maxPerRow: 3, maxRows: 2, catHome: i === 0 }, env);
     }
     for (const hall of cells.filter((cell) => cell.hall)) paintHall(g, hall, `${seedOf(hall.i)}#hall`, env);
 
@@ -2037,6 +2126,8 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   }
 
   seasonTables(env);
+  // Everything a click switches on and off.
+  const switches = () => [...lamps, ...glows, ...workLights].filter((item) => item.box);
   return {
     background,
     height,
@@ -2059,6 +2150,10 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     },
     // Drawn over everything: the evening dims the office, lamps light up around
     // them. Returns how dark it is, so labels can switch to a light ink.
+    workLights,
+    ghosts,
+    toggleAt: (x, y) => toggleAt(switches(), x, y),
+    hitSwitch: (x, y) => Boolean(switchAt(switches(), x, y)),
     shade(ctx, date, width, h) {
       const { night, dusk, dawn } = daylight(date);
       if (dusk) {
@@ -2069,18 +2164,22 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
         ctx.fillStyle = `rgb(255 150 140 / ${0.14 * dawn})`;
         ctx.fillRect(0, 0, width, h);
       }
-      if (!night) return 0;
-      // Multiplied rather than painted over, so colours darken without going grey.
-      const tint = [255, 255, 255].map((v, i) => Math.round(v + ([118, 128, 186][i] - v) * night));
-      ctx.save();
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = `rgb(${tint.join(' ')})`;
-      ctx.fillRect(0, 0, width, h);
-      ctx.restore();
-      for (const { x, y } of lamps) {
+      if (night) {
+        // Multiplied rather than painted over, so colours darken without going grey.
+        const tint = [255, 255, 255].map((v, i) => Math.round(v + ([118, 128, 186][i] - v) * night));
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.fillStyle = `rgb(${tint.join(' ')})`;
+        ctx.fillRect(0, 0, width, h);
+        ctx.restore();
+      }
+      for (const lamp of lamps) {
+        const level = lightLevel(lamp, night > 0, night);
+        if (!level) continue;
+        const { x, y } = lamp;
         const r = u(150);
         const glow = ctx.createRadialGradient(x, y, 0, x, y, r);
-        glow.addColorStop(0, `rgb(255 214 120 / ${0.42 * night})`);
+        glow.addColorStop(0, `rgb(255 214 120 / ${0.42 * level})`);
         glow.addColorStop(1, 'rgb(255 214 120 / 0)');
         ctx.fillStyle = glow;
         ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
@@ -2089,14 +2188,16 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
       // lights, shine through the dark.
       const now = performance.now();
       const extra = skyEvent(season);
-      if (extra) {
+      if (night && extra) {
         const light = daylight(date);
         skies.forEach((w, i) => extra(ctx, w, i, light, now, px));
       }
       for (const g of glows) {
+        const level = lightLevel(g, g.isLit ? g.isLit() : night > 0, night);
+        if (!level) continue;
         const r = u(g.r * 5);
         const halo = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, r);
-        halo.addColorStop(0, `rgb(255 196 90 / ${0.35 * night})`);
+        halo.addColorStop(0, `rgb(255 196 90 / ${0.35 * level})`);
         halo.addColorStop(1, 'rgb(255 196 90 / 0)');
         ctx.fillStyle = halo;
         ctx.fillRect(g.x - r, g.y - r, 2 * r, 2 * r);

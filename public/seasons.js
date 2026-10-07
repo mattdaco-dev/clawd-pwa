@@ -173,6 +173,19 @@ const LITTLE_GHOST = sprite([
   'WWWWWW',
   'W.WW.W',
 ]);
+// Frightened, like the ghosts of Pac-Man: blue with a wavy mouth, flashing
+// white just before it calms down.
+const SCARED_ROWS = [
+  '.BBBB.',
+  'BBBBBB',
+  'BWBBWB',
+  'BBBBBB',
+  'BBWBWB',
+  'BWBWBB',
+  'B.BB.B',
+];
+const SCARED_GHOST = sprite(SCARED_ROWS);
+const SCARED_FLASH = sprite(SCARED_ROWS.map((r) => r.replace(/[BW]/g, (c) => (c === 'B' ? 'W' : 'R'))));
 const flipped = (s) => ({ ...s, cells: s.cells.map(([x, y, c]) => [s.w - 1 - x, y, c]) });
 
 // National days: the flag's three colours, and whether its bands are vertical.
@@ -459,7 +472,7 @@ export function seasonFloor(env, place, g, area) {
     const at = place(CAULDRON);
     if (at) {
       props.push({ base: Math.round(at.top + CAULDRON.h * p), draw: (ctx) => drawSprite(ctx, CAULDRON, at.left, at.top, p) });
-      glows.push({ cells: CAULDRON_BREW, left: at.left, top: at.top, p, x: at.left + 5 * p, y: at.top + p, r: 9 });
+      glows.push({ cells: CAULDRON_BREW, left: at.left, top: at.top, p, x: at.left + 5 * p, y: at.top + p, r: 9, box: { x: at.left, y: at.top, w: CAULDRON.w * p, h: CAULDRON.h * p } });
     }
   } else if (season === 'noel') {
     for (let i = 0; i < 2; i++) put(POINSETTIA);
@@ -591,30 +604,93 @@ function threadSpider(env, x, top, low) {
 }
 
 // Now and then a little ghost drifts across the room, over everything, and fades.
+// A click frightens it: it races around the room for a few seconds, then
+// calms down and fades away.
+const SCARE_MS = 2600;
+const FLASH_MS = 700; // flashing at the end of the fright
 function driftingGhost(env, area) {
   const { p, u, props } = env;
-  const ghost = { start: performance.now() + 5000 + Math.random() * 20000, dir: 1, y: 0 };
+  const ghost = { start: performance.now() + 5000 + Math.random() * 20000, dir: 1, y: 0, at: null, scared: null };
   const span = area.x1 - area.x0 + u(80);
   const ms = (span / u(45)) * 1000;
+  const top = area.y0 - u(40);
+  const bottom = area.y1 - LITTLE_GHOST.h * p;
+  const rest = (now) => {
+    ghost.start = now + 25000 + Math.random() * 50000;
+    ghost.dir = Math.random() < 0.5 ? 1 : -1;
+    ghost.y = top + Math.random() * (area.y1 - area.y0) * 0.6;
+    ghost.at = null;
+    ghost.scared = null;
+  };
+  // Running away: straight lines at full speed, bouncing off the walls, now and then a new heading.
+  const flee = (now, dt) => {
+    const f = ghost.scared;
+    if (now >= f.turn) {
+      const angle = Math.atan2(f.vy, f.vx) + (Math.random() - 0.5) * 2.2;
+      const speed = Math.hypot(f.vx, f.vy);
+      f.vx = Math.cos(angle) * speed;
+      f.vy = Math.sin(angle) * speed;
+      f.turn = now + 300 + Math.random() * 400;
+    }
+    f.x += (f.vx * dt) / 1000;
+    f.y += (f.vy * dt) / 1000;
+    if (f.x < area.x0 || f.x > area.x1 - LITTLE_GHOST.w * p) f.vx = -f.vx;
+    if (f.y < top || f.y > bottom) f.vy = -f.vy;
+    f.x = Math.min(Math.max(f.x, area.x0), area.x1 - LITTLE_GHOST.w * p);
+    f.y = Math.min(Math.max(f.y, top), bottom);
+  };
+  let last = performance.now();
   props.push({
     base: 1e9,
     draw(ctx) {
       const now = performance.now();
-      if (now < ghost.start) return;
-      const t = (now - ghost.start) / ms;
-      if (t >= 1) {
-        ghost.start = now + 25000 + Math.random() * 50000;
-        ghost.dir = Math.random() < 0.5 ? 1 : -1;
-        ghost.y = area.y0 - u(40) + Math.random() * (area.y1 - area.y0) * 0.6;
+      const dt = Math.min(now - last, 100);
+      last = now;
+      ghost.at = null;
+      if (ghost.scared) {
+        const f = ghost.scared;
+        const t = now - f.t0;
+        if (t >= SCARE_MS + 500) return rest(now);
+        flee(now, dt);
+        ghost.at = { x: f.x, y: f.y };
+        const flash = t > SCARE_MS - FLASH_MS && Math.floor(now / 120) % 2;
+        const look = flash ? SCARED_FLASH : SCARED_GHOST;
+        ctx.save();
+        ctx.globalAlpha = 0.85 * Math.min(1, (SCARE_MS + 500 - t) / 500); // fades once calm
+        drawSprite(ctx, f.vx < 0 ? flipped(look) : look, f.x, f.y + Math.sin(now / 90) * p, p);
+        ctx.restore();
         return;
       }
-      if (!ghost.y) ghost.y = area.y0 - u(40) + Math.random() * (area.y1 - area.y0) * 0.6;
+      if (now < ghost.start) return;
+      const t = (now - ghost.start) / ms;
+      if (t >= 1) return rest(now);
+      if (!ghost.y) ghost.y = top + Math.random() * (area.y1 - area.y0) * 0.6;
       const x = ghost.dir > 0 ? area.x0 - u(40) + t * span : area.x1 + u(40) - t * span;
       const y = ghost.y + Math.sin(now / 400) * u(6);
+      ghost.at = { x, y };
       ctx.save();
       ctx.globalAlpha = 0.75 * Math.min(1, t * 6, (1 - t) * 6);
       drawSprite(ctx, ghost.dir > 0 ? LITTLE_GHOST : flipped(LITTLE_GHOST), x, y, p);
       ctx.restore();
+    },
+  });
+  const hit = (x, y) => {
+    const at = ghost.at;
+    const pad = 2 * p;
+    return Boolean(at) && x >= at.x - pad && x <= at.x + (LITTLE_GHOST.w + 2) * p && y >= at.y - pad && y <= at.y + (LITTLE_GHOST.h + 2) * p;
+  };
+  env.ghosts?.push({
+    hit,
+    // Runs off away from the click, fast.
+    scare(x, y, now) {
+      if (!hit(x, y) || ghost.scared) return false;
+      const { x: gx, y: gy } = ghost.at;
+      const cx = gx + (LITTLE_GHOST.w * p) / 2;
+      const cy = gy + (LITTLE_GHOST.h * p) / 2;
+      const angle = Math.atan2(cy - y, cx - x) + (Math.random() - 0.5) * 0.8;
+      const speed = u(330);
+      ghost.scared = { t0: now, x: gx, y: gy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, turn: now + 350 };
+      return true;
     },
   });
 }

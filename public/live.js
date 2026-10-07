@@ -1,7 +1,7 @@
 import { ANIMS, BALL, FRAME_H, FRAME_W, PASS } from './sprites.js';
 import { PALETTES, cycleDone, fitCanvas, frameIndex } from './render.js';
 import { DECORS, DEFAULT_SETTINGS } from './decor.js';
-import { daylight, drawLight, seasonOf } from './office.js';
+import { daylight, drawLight, lightLevel, seasonOf } from './office.js';
 import { currentWeather } from './weather.js';
 import { costumeFor, drawDressed } from './costumes.js';
 import { Cat } from './cat.js';
@@ -914,7 +914,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       critter.scale = scaleFor(critter.kind, px);
       critter.relocate();
     }
-    cat.place(office, px, performance.now());
+    cat.place(office, px, performance.now(), { season, salt: view.salt });
   }
 
   // Whoever just finished working looks for an idle Clawd close by.
@@ -1021,13 +1021,14 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     const night = office.shade?.(ctx, date, width, height) ?? 0;
     const dark = night > 0.5;
     // At night, working at a desk, a shelf or a whiteboard switches its light on;
-    // it goes off once nobody works there any more.
-    if (night) {
-      const lit = new Set();
-      for (const c of critters.values()) {
-        if (c.state === 'working' && !c.target && c.slot?.light) lit.add(c.slot.light);
-      }
-      for (const light of lit) drawLight(ctx, light, night);
+    // it goes off once nobody works there any more. A click switches it by hand.
+    const lit = new Set();
+    for (const c of critters.values()) {
+      if (night && c.state === 'working' && !c.target && c.slot?.light) lit.add(c.slot.light);
+    }
+    for (const light of office.workLights ?? []) {
+      const level = lightLevel(light, lit.has(light), night);
+      if (level) drawLight(ctx, light, level);
     }
     for (const duo of duos) duo.drawOver(ctx, now);
     cat.drawOver(ctx, now, dark);
@@ -1054,13 +1055,16 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     raf = requestAnimationFrame(tick);
   }
 
-  // The Clawd under the pointer, if any: its body or its name.
-  function critterAt(x, y) {
+  // The Clawd under the pointer, if any: its body, or loosely around it and its name
+  // (after the lamps, so a desk lamp beside a Clawd can still be switched).
+  function critterAt(x, y, loose = false) {
     let best = null;
     let bestDist = Infinity;
     for (const c of critters.values()) {
       if (c.leaving) continue;
-      const inside = Math.abs(x - c.x) <= (HALF_BODY + 2) * c.scale && y >= c.y - (HEAD + 4) * c.scale && y <= c.y + 16 + c.scale;
+      const inside = loose
+        ? Math.abs(x - c.x) <= (HALF_BODY + 2) * c.scale && y >= c.y - (HEAD + 4) * c.scale && y <= c.y + 16 + c.scale
+        : Math.abs(x - c.x) <= 6.5 * c.scale && y >= c.y - HEAD * c.scale && y <= c.y;
       const dist = Math.hypot(x - c.x, y - (c.y - (HEAD / 2) * c.scale));
       if (inside && dist < bestDist) {
         best = c;
@@ -1093,11 +1097,18 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
   }
 
   canvas.addEventListener('click', (e) => {
-    if (cat.hit(e.offsetX, e.offsetY)) return cat.pet(performance.now());
-    openCard(critterAt(e.offsetX, e.offsetY));
+    const [x, y] = [e.offsetX, e.offsetY];
+    if (cat.hit(x, y)) return cat.pet(performance.now());
+    const critter = critterAt(x, y);
+    if (critter) return openCard(critter);
+    if (office.ghosts?.some((g) => g.scare(x, y, performance.now()))) return;
+    if (office.toggleAt?.(x, y)) return;
+    openCard(critterAt(x, y, true));
   });
   canvas.addEventListener('mousemove', (e) => {
-    canvas.style.cursor = critterAt(e.offsetX, e.offsetY) || cat.hit(e.offsetX, e.offsetY) ? 'pointer' : '';
+    const [x, y] = [e.offsetX, e.offsetY];
+    const any = cat.hit(x, y) || critterAt(x, y, true) || office?.ghosts?.some((g) => g.hit(x, y)) || office?.hitSwitch?.(x, y);
+    canvas.style.cursor = any ? 'pointer' : '';
   });
   card.addEventListener('click', (e) => {
     if (e.target.closest('.close')) openCard(null);

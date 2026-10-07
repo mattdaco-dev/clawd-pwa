@@ -1,9 +1,10 @@
-// The office cat: asleep on top of a bookcase most of the time, it hops down
-// now and then for a stroll. When a Clawd waits for an input, it goes and sits
-// beside it until someone answers, crossing rooms through their doors.
+// The office cat: asleep on top of a bookcase or in its basket most of the
+// time, it gets up now and then for a stroll or a bite. When a Clawd waits for
+// an input, it goes and sits beside it until someone answers, crossing rooms
+// through their doors.
 import { INK } from './pixels.js';
 
-// Facing right, feet on the bottom row. K fur, Y eyes, q nose, G closed eyes.
+// Facing right, feet on the bottom row. K fur, Y eyes, q nose; coats recolour them.
 const SIT = [
   '.......K...K',
   '.......KKKKK',
@@ -51,10 +52,51 @@ const LOAF = [
   '.KKKKKKKKKK.',
   'KKKKKKKKKK..',
 ];
+// Head down over the bowl, the nose in it; the tail sways.
+const EAT = [
+  [
+    'K............',
+    '.K...........',
+    '..KKKKKKK.K.K',
+    '.KKKKKKKKKKKK',
+    '.KKKKKKKKKYKY',
+    '.K.K....KKKKq',
+    '.K.K...K.K...',
+  ],
+  [
+    '.............',
+    'KK...........',
+    '..KKKKKKK....',
+    '.KKKKKKKK.K.K',
+    '.KKKKKKKKKKKK',
+    '.K.K....KKYKY',
+    '.K.K...K.KKKq',
+  ],
+];
+// Where the stripes of a tabby go, by pose: on its back and flanks.
+const STRIPES = {
+  sit: (x, y) => y >= 5 && x <= 8 && x % 2 === 0,
+  walk: (x, y) => y >= 3 && y <= 5 && x >= 2 && x <= 9 && x % 2 === 1,
+  loaf: (x, y) => y >= 2 && x <= 7 && x % 2 === 1,
+  eat: (x, y) => y >= 2 && y <= 4 && x >= 2 && x <= 8 && x % 2 === 0,
+};
 const HEART = ['.R.R.', 'RRRRR', '.RRR.', '..R..'];
 
-const ROAM_EVERY = [40_000, 120_000]; // ms on its bookcase before a stroll
+// Coats: fur, stripes (none for a plain coat) and eyes, as palette keys.
+const COATS = [
+  { fur: 'K', eyes: 'Y' }, // black
+  { fur: 'o', stripe: 'n', eyes: 'P' }, // ginger tabby
+  { fur: 'G', stripe: 'K', eyes: 'Y' }, // grey tabby
+  { fur: 'L', stripe: 'G', eyes: 'c' }, // silver tabby
+  { fur: 'H', stripe: 'D', eyes: 'P' }, // brown tabby
+];
+const BLACK = COATS[0];
+
+const ROAM_EVERY = [40_000, 120_000]; // ms asleep before getting up
 const SIT_MS = [3000, 8000];
+const EAT_MS = [4000, 7000];
+const HUNGRY = 0.5; // chance an outing starts with a bite
+const TO_BED = 0.45; // chance it naps in the basket rather than on a bookcase, by day
 const HOP_MS = 450;
 const AWAY_MS = 1500; // between two rooms, out of sight
 const SPEED = 10; // sprite pixels per second
@@ -64,34 +106,54 @@ const rand = ([lo, hi]) => lo + Math.random() * (hi - lo);
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
 
+function hash(text) {
+  let h = 2166136261;
+  for (const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return h >>> 0;
+}
+
+// A coat for the day (and the decor's salt); always black at Halloween.
+export function coatFor(season, salt = '') {
+  if (season === 'halloween') return BLACK;
+  return COATS[hash(`${salt}${new Date().toDateString()}`) % COATS.length];
+}
+
 export class Cat {
   constructor() {
     this.zoneIndex = 0;
     this.dir = 1;
     this.scale = 4;
     this.mode = 'away';
+    this.coat = BLACK;
     this.friend = null;
     this.heartUntil = 0;
     this.box = null; // where it was last drawn, for clicks
   }
 
-  // The office was rebuilt: straight back to a bookcase of its room.
-  place(office, px, now) {
+  // The office was rebuilt: straight back to sleep somewhere in its room.
+  place(office, px, now, { season = null, salt = '' } = {}) {
     this.office = office;
     this.scale = px;
+    this.coat = coatFor(season, salt);
     this.zoneIndex = Math.min(this.zoneIndex, office.zones.length - 1);
     this.zone = office.zones[this.zoneIndex];
     this.friend = null;
     this.target = null;
     this.hop = null;
+    this.errand = null;
     this.settle(now);
   }
 
-  // On a bookcase, or curled up on the floor in a decor without one.
+  // On a bookcase or in its basket, or curled up on the floor in a decor without either.
   settle(now) {
     const perches = this.zone.perches ?? [];
+    const bed = this.zone.catBed;
     this.perch = perches.length ? pick(perches) : null;
-    if (this.perch) {
+    if (bed && (!this.perch || Math.random() < TO_BED)) {
+      this.x = bed.x;
+      this.y = bed.y;
+      this.mode = 'bed';
+    } else if (this.perch) {
       this.x = this.perch.x;
       this.y = this.perch.y;
       this.mode = 'perched';
@@ -101,8 +163,16 @@ export class Cat {
       this.y = spot.y;
       this.mode = 'nap';
     }
-    this.asleep = Math.random() < 0.7;
+    this.fallAsleep(now);
+  }
+
+  fallAsleep(now) {
+    this.asleep = Math.random() < 0.75;
     this.nextRoam = now + rand(ROAM_EVERY);
+  }
+
+  get resting() {
+    return this.mode === 'perched' || this.mode === 'bed' || this.mode === 'nap';
   }
 
   floorSpot() {
@@ -116,9 +186,17 @@ export class Cat {
     return { x: perch.x, y: clamp(perch.base + 8 * this.scale, this.zone.y0, this.zone.y1) };
   }
 
-  // Back-to-front key: on a bookcase it is drawn right in front of it.
+  // The first room with a basket or bowls (`what`), and the room it is in.
+  find(what) {
+    const i = this.office.zones.findIndex((z) => z[what]);
+    return i < 0 ? null : { i, spot: this.office.zones[i][what] };
+  }
+
+  // Back-to-front key: on a bookcase it is drawn right in front of it, in its
+  // basket between the cushion and the front rim.
   get key() {
     if (this.mode === 'perched') return this.perch.base;
+    if (this.mode === 'bed') return this.zone.catBed.base;
     if (this.hop) return Math.max(this.hop.from.y, this.hop.to.y);
     return this.y;
   }
@@ -153,12 +231,10 @@ export class Cat {
   think(now, dark) {
     const { friend } = this;
     if (friend) {
+      if (this.mode === 'perched' || this.mode === 'bed') return this.getUp(now);
+      this.errand = null;
       const at = this.office.zones.indexOf(friend.zone);
-      if (this.mode === 'perched') return this.hopDown(now);
-      if (at !== this.zoneIndex) {
-        this.nextZone = at;
-        return this.walkTo(this.zone.door ?? { x: this.zone.x0, y: this.zone.y0 }, 'door');
-      }
+      if (at !== this.zoneIndex) return this.toZone(at);
       const spot = this.beside(friend);
       if (Math.hypot(spot.x - this.x, spot.y - this.y) > 6 * this.scale) return this.walkTo(spot, 'attend');
       this.mode = 'sit';
@@ -166,16 +242,27 @@ export class Cat {
       this.dir = friend.x > this.x ? 1 : -1;
       return;
     }
-    if (this.mode === 'perched' || this.mode === 'nap') {
+    if (this.resting) {
       // Nights are for sleeping.
       if (now < this.nextRoam || dark) return;
       this.trips = 1 + Math.floor(Math.random() * 3);
-      if (this.mode === 'perched') return this.hopDown(now);
-      return this.walkTo(this.floorSpot(), 'sit');
+      this.hungry = Math.random() < HUNGRY;
+      if (this.mode === 'nap') return this.walkTo(this.floorSpot(), 'sit');
+      return this.getUp(now);
+    }
+    if (this.mode === 'eat' && now >= this.until) {
+      this.mode = 'sit';
+      this.until = now + 1200; // licks its chops
+      return;
     }
     if (this.mode === 'sit' && now >= this.until) {
-      if (--this.trips > 0) return this.walkTo(this.floorSpot(), 'sit');
-      return this.goHome(now);
+      const bowls = this.hungry && this.find('catBowls');
+      if (bowls) {
+        this.hungry = false;
+        return this.goTo(bowls, 'eat');
+      }
+      if (--this.trips > 0 && !dark) return this.walkTo(this.floorSpot(), 'sit');
+      return this.goHome(dark);
     }
   }
 
@@ -189,16 +276,34 @@ export class Cat {
     };
   }
 
-  goHome(now) {
+  // Off a bookcase or out of the basket, onto the floor.
+  getUp(now) {
+    if (this.mode === 'bed') return this.startHop({ x: this.x, y: this.y }, this.zone.catBed.front, now, 'down');
+    if (this.mode === 'perched') return this.startHop({ x: this.x, y: this.y }, this.below(this.perch), now, 'down');
+    this.mode = 'sit';
+    this.until = now + 600;
+  }
+
+  // The basket at night or now and then, otherwise a bookcase of the room.
+  goHome(dark) {
     const perches = this.zone.perches ?? [];
+    const bed = this.find('catBed');
+    if (bed && (dark || !perches.length || Math.random() < TO_BED)) return this.goTo({ i: bed.i, spot: bed.spot.front }, 'bed');
     if (!perches.length) return this.walkTo(this.floorSpot(), 'nap');
     this.perch = pick(perches);
     this.walkTo(this.below(this.perch), 'hop-up');
   }
 
-  hopDown(now) {
-    const to = this.below(this.perch);
-    this.startHop({ x: this.x, y: this.y }, to, now, 'down');
+  // To a spot of room i, through the doors if it is another room.
+  goTo({ i, spot }, next) {
+    if (i === this.zoneIndex) return this.walkTo(spot, next);
+    this.errand = { i, spot, next };
+    this.toZone(i);
+  }
+
+  toZone(i) {
+    this.nextZone = i;
+    this.walkTo(this.zone.door ?? { x: this.zone.x0, y: this.zone.y0 }, 'door');
   }
 
   startHop(from, to, now, way) {
@@ -213,10 +318,9 @@ export class Cat {
     this.hop = null;
     this.x = to.x;
     this.y = to.y;
-    if (way === 'up') {
-      this.mode = 'perched';
-      this.asleep = Math.random() < 0.7;
-      this.nextRoam = now + rand(ROAM_EVERY);
+    if (way === 'up' || way === 'bed') {
+      this.mode = way === 'up' ? 'perched' : 'bed';
+      this.fallAsleep(now);
     } else {
       this.mode = 'sit';
       this.until = now + 600;
@@ -254,14 +358,22 @@ export class Cat {
     switch (this.next) {
       case 'hop-up':
         return this.startHop({ x: this.x, y: this.y }, { x: this.perch.x, y: this.perch.y }, now, 'up');
+      case 'bed': {
+        const { x, y } = this.zone.catBed;
+        return this.startHop({ x: this.x, y: this.y }, { x, y }, now, 'bed');
+      }
       case 'door':
         this.mode = 'away';
         this.until = now + AWAY_MS;
         return;
       case 'nap':
         this.mode = 'nap';
-        this.asleep = Math.random() < 0.7;
-        this.nextRoam = now + rand(ROAM_EVERY);
+        this.fallAsleep(now);
+        return;
+      case 'eat':
+        this.mode = 'eat';
+        this.dir = 1;
+        this.until = now + rand(EAT_MS);
         return;
       default:
         this.mode = 'sit';
@@ -269,13 +381,16 @@ export class Cat {
     }
   }
 
-  // Comes in through the door of the room it was heading to.
+  // Comes in through the door of the room it was heading to, then on with its errand.
   enter(now) {
     this.zoneIndex = clamp(this.nextZone ?? this.zoneIndex, 0, this.office.zones.length - 1);
     this.zone = this.office.zones[this.zoneIndex];
     const door = this.zone.door ?? { x: this.zone.x0, y: this.zone.y0 };
     this.x = door.x;
     this.y = door.y;
+    const errand = this.errand;
+    this.errand = null;
+    if (errand?.i === this.zoneIndex && !this.friend) return this.walkTo(errand.spot, errand.next);
     this.mode = 'sit';
     this.until = now + 300;
   }
@@ -292,15 +407,17 @@ export class Cat {
   }
 
   pose(now) {
-    if (this.hop) return { rows: WALK[1], eyes: true };
-    if (this.mode === 'walk') return { rows: WALK[Math.floor(now / 160) % 2], eyes: true };
-    if (this.mode === 'perched' || this.mode === 'nap') return { rows: LOAF, eyes: !this.asleep };
+    if (this.hop) return { rows: WALK[1], stripes: STRIPES.walk, eyes: true };
+    if (this.mode === 'walk') return { rows: WALK[Math.floor(now / 160) % 2], stripes: STRIPES.walk, eyes: true };
+    if (this.mode === 'eat') return { rows: EAT[Math.floor(now / 380) % 2], stripes: STRIPES.eat, eyes: true };
+    if (this.resting) return { rows: LOAF, stripes: STRIPES.loaf, eyes: !this.asleep };
     const tail = TAILS[Math.floor(now / 450) % TAILS.length];
-    return { rows: SIT, tail, eyes: now % 3200 > 150 }; // a blink now and then
+    return { rows: SIT, tail, stripes: STRIPES.sit, eyes: now % 3200 > 150 }; // a blink now and then
   }
 
   draw(ctx, now) {
     this.box = null;
+    this.eyes = [];
     if (this.mode === 'away' || !this.office) return;
     const s = this.scale;
     let { x, y } = this;
@@ -310,33 +427,35 @@ export class Cat {
       x = from.x + (to.x - from.x) * t;
       y = from.y + (to.y - from.y) * t - 14 * s * 4 * t * (1 - t);
     }
-    const { rows, tail, eyes } = this.pose(now);
+    const { rows, tail, stripes, eyes } = this.pose(now);
+    const coat = this.coat;
     const w = rows[0].length;
     const h = rows.length;
     const left = Math.round(x - (w / 2) * s);
     const top = Math.round(y - h * s);
     const flip = this.dir < 0;
-    if (this.mode !== 'perched' && !this.hop) {
+    if (!this.hop && this.mode !== 'perched' && this.mode !== 'bed') {
       ctx.fillStyle = 'rgb(61 57 41 / 0.08)';
       ctx.beginPath();
       ctx.ellipse(Math.round(x), Math.round(y), 5 * s, 1.2 * s, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+    const at = (i) => left + (flip ? w - 1 - i : i) * s;
     const cell = (i, j, key) => {
       ctx.fillStyle = INK[key];
-      ctx.fillRect(left + (flip ? w - 1 - i : i) * s, top + j * s, s, s);
+      ctx.fillRect(at(i), top + j * s, s, s);
     };
-    this.eyes = [];
+    const fur = (i, j) => (coat.stripe && stripes(i, j) ? coat.stripe : coat.fur);
     rows.forEach((row, j) => [...row].forEach((k, i) => {
       if (k === '.') return;
       if (k === 'Y') {
-        if (eyes) this.eyes.push([left + (flip ? w - 1 - i : i) * s, top + j * s]);
-        return cell(i, j, eyes ? 'Y' : 'K');
+        if (eyes) this.eyes.push([at(i), top + j * s]);
+        return cell(i, j, eyes ? coat.eyes : coat.fur); // shut: just fur
       }
-      cell(i, j, k);
+      cell(i, j, k === 'K' ? fur(i, j) : k);
     }));
-    for (const [i, j] of tail ?? []) cell(i, j, 'K');
-    if (!eyes && (this.mode === 'perched' || this.mode === 'nap')) {
+    for (const [i, j] of tail ?? []) cell(i, j, coat.fur);
+    if (!eyes && this.resting) {
       // Sleeping: z's drifting up.
       const t = (now / 900) % 1;
       const zx = left + (flip ? -2 : w + 1) * s;
@@ -353,8 +472,8 @@ export class Cat {
     if (!this.box) return;
     const s = this.scale;
     if (dark) {
-      ctx.fillStyle = INK.Y;
-      for (const [x, y] of this.eyes ?? []) ctx.fillRect(x, y, s, s);
+      ctx.fillStyle = INK[this.coat.eyes];
+      for (const [x, y] of this.eyes) ctx.fillRect(x, y, s, s);
     }
     if (now < this.heartUntil) {
       const rise = Math.round(((1600 - (this.heartUntil - now)) / 1600) * 6) * s;
