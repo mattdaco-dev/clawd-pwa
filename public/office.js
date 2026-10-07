@@ -1214,6 +1214,33 @@ function floorLamp(left, base, p) {
 // itself (night, someone at work); a click forces it the other way until that
 // changes. Forced on by day, it still shows.
 const DAY_LIGHT = 0.55;
+// For the bare decor: a desk for one main Clawd, with a plant or a cabinet
+// beside it, in the middle of its zone. Returns its props and its station,
+// which subagents leave to the main one.
+const DESK_DECOR = [PLANT, CACTUS, SNAKE_PLANT, FLOWERS, PLANT_TALL, PALM, MONSTERA, LOW_SHELF_PLANT, CABINET];
+export function bareDesk({ x0, x1, y0, y1 }, p, seed) {
+  const random = seeded(seed);
+  const deco = DESK_DECOR[Math.floor(random() * DESK_DECOR.length)];
+  const before = random() < 0.5; // the deco on the left or on the right
+  const gap = 3 * p;
+  const total = (DESK.w + deco.w) * p + gap;
+  const start = Math.round((x0 + x1 - total) / 2);
+  const left = before ? start + deco.w * p + gap : start;
+  const decoLeft = before ? start : left + DESK.w * p + gap;
+  const top = Math.round((y0 + y1) / 2 - (DESK.h * p) / 2);
+  const base = top + DESK.h * p;
+  return {
+    props: [
+      { base, draw: (ctx) => drawSprite(ctx, DESK, left, top, p) },
+      { base: base - 1, draw: (ctx) => drawSprite(ctx, deco, decoLeft, base - deco.h * p, p) },
+    ],
+    station: {
+      type: 'desk', occupant: null, dir: 1, mainOnly: true,
+      spot: (scale) => ({ x: left + 18 * p, y: top + (DESK_SURFACE + 1) * p + 2 * scale }),
+    },
+  };
+}
+
 export function lightLevel(item, auto, night) {
   if (item.force != null && item.forceAuto !== auto) item.force = null;
   item.auto = auto;

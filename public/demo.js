@@ -162,6 +162,7 @@ export function createDemoBar(root, model, scene, settings) {
     return `
       <div class="demo-row">
         <span class="demo-label">Décor</span>${seg('decor', Object.fromEntries(Object.entries(DECORS).map(([k, d]) => [k, d.label])), current.decor)}
+        <span class="demo-label">Bureau</span>${seg('desk', { off: 'Non', on: 'Oui' }, current.desk, current.decor !== 'none')}
         <span class="demo-label">Disposition</span>${seg('layout', LAYOUTS, current.layout, current.decor === 'none')}
         <label class="demo-label">Extérieur <select data-setting="outside"${current.decor === 'none' ? ' disabled' : ''}>${options(OUTSIDES, current.outside)}</select></label>
         <span class="demo-label">Pixels</span>${seg('px', Object.fromEntries(PIXEL_SIZES.map((n) => [n, n])), current.px)}
@@ -256,6 +257,7 @@ export function createDemoBar(root, model, scene, settings) {
         decor: Math.random() < 0.85 ? 'open-space' : 'none',
         layout: pickOne(Object.keys(LAYOUTS)),
         outside: pickOne(Object.keys(OUTSIDES).filter((k) => k !== 'random')),
+        desk: pickOne(['on', 'off']),
       };
       view = {
         hour: pickOne(HOURS)[0],

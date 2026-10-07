@@ -2,16 +2,16 @@
 // of sessions and the settings: a background canvas and its height (taller
 // than the window when rooms overflow), the zones Clawds walk in with their
 // stations, depth-sorted props and an overlay drawn every frame.
-import { buildOffice } from './office.js';
+import { bareDesk, buildOffice } from './office.js';
 import { WORLDS } from './outdoors.js';
 
 export const LAYOUTS = { rooms: 'Salles', shared: 'Open space partagé' };
 export const PIXEL_SIZES = [1, 2, 3, 4, 5, 6];
 export const OUTSIDES = { random: 'Au hasard', none: 'Aucun', ...WORLDS };
-export const DEFAULT_SETTINGS = { decor: 'open-space', layout: 'rooms', px: 4, notify: 'off', outside: 'random' };
+export const DEFAULT_SETTINGS = { decor: 'open-space', layout: 'rooms', px: 4, notify: 'off', outside: 'random', desk: 'off' };
 
 // No furniture: an empty floor split in columns, no stations, Clawds wander anywhere.
-function buildBare(width, height, names, { px }) {
+function buildBare(width, height, names, { px, desk = 'off', salt = '' }) {
   const background = document.createElement('canvas');
   const dpr = window.devicePixelRatio || 1;
   background.width = Math.round(width * dpr);
@@ -32,7 +32,16 @@ function buildBare(width, height, names, { px }) {
     y1: height - labelSpace,
     stations: {},
   }));
-  return { background, height, zones, shared: false, props: [], overlay() {} };
+  // On request, a desk per session (so per main Clawd), with a little decoration.
+  const props = [];
+  if (desk === 'on') {
+    zones.forEach((zone, i) => {
+      const d = bareDesk(zone, px, `${salt}${names[i] ?? i}#desk`);
+      props.push(...d.props);
+      zone.stations.desk = [d.station];
+    });
+  }
+  return { background, height, zones, shared: false, props, overlay() {} };
 }
 
 export const DECORS = {

@@ -12,6 +12,7 @@ try {
 if (!(settings.decor in DECORS)) settings.decor = DEFAULT_SETTINGS.decor;
 if (!(settings.layout in LAYOUTS)) settings.layout = DEFAULT_SETTINGS.layout;
 if (!(settings.outside in OUTSIDES)) settings.outside = DEFAULT_SETTINGS.outside;
+if (!['on', 'off'].includes(settings.desk)) settings.desk = DEFAULT_SETTINGS.desk;
 if (!PIXEL_SIZES.includes(settings.px)) settings.px = DEFAULT_SETTINGS.px;
 const canNotify = 'Notification' in window && 'serviceWorker' in navigator;
 if (!canNotify || Notification.permission !== 'granted') settings.notify = 'off';
@@ -46,6 +47,7 @@ function renderSettings() {
     input.checked = String(settings[input.name]) === input.value;
   }
   for (const set of menu.querySelectorAll('[data-needs-decor]')) set.disabled = settings.decor === 'none';
+  for (const set of menu.querySelectorAll('[data-needs-bare]')) set.disabled = settings.decor !== 'none';
 }
 
 for (const input of menu.querySelectorAll('.setting input')) {

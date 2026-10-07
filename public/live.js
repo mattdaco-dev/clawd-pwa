@@ -268,7 +268,7 @@ class Critter {
 
     this.release();
     if (plan.station) {
-      const free = zone.stations[plan.station]?.filter((s) => !s.occupant) ?? [];
+      const free = zone.stations[plan.station]?.filter((s) => !s.occupant && (!s.mainOnly || this.kind === 'main')) ?? [];
       this.slot = this.nearParent(free) ?? free[0] ?? null;
       if (this.slot) this.slot.occupant = this;
     }
@@ -903,13 +903,13 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
   // Rebuilds the decor when the window, the settings or the list of sessions change.
   function ensureOffice(sessions) {
     const names = sessions.map((s) => s.name || s.id.slice(0, 8));
-    const { decor, layout, px, outside = 'random' } = settings;
+    const { decor, layout, px, outside = 'random', desk = 'off' } = settings;
     season = view.season === 'auto' ? seasonOf(sceneDate(view.hour)) : view.season;
     const world = outside === 'random' ? worldOfDay(sceneDate(view.hour), view.salt) : outside;
-    const key = `${decor}|${layout}|${px}|${season}|${world}|${view.salt}|${width}x${viewHeight}|${names.join('|')}`;
+    const key = `${decor}|${desk}|${layout}|${px}|${season}|${world}|${view.salt}|${width}x${viewHeight}|${names.join('|')}`;
     if (key === officeKey) return;
     officeKey = key;
-    office = (DECORS[decor] ?? DECORS[DEFAULT_SETTINGS.decor]).build(width, viewHeight, names, { layout, px, season, salt: view.salt, world });
+    office = (DECORS[decor] ?? DECORS[DEFAULT_SETTINGS.decor]).build(width, viewHeight, names, { layout, px, season, salt: view.salt, world, desk });
     height = office.height;
     ctx = fitCanvas(canvas, width, height);
     for (const critter of critters.values()) {
