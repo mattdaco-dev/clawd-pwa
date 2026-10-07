@@ -6,7 +6,7 @@
 // Distances below are written for 5 px pixels and scaled by u() to the chosen
 // pixel size, so the whole office zooms with the Clawds.
 import { INK, drawSprite, sprite } from './pixels.js';
-import { seasonCritters, seasonFloor, seasonWall, snowSill, treeTrain, wallSpiders } from './seasons.js';
+import { TREE_GIFTS, seasonCritters, seasonFloor, seasonWall, skyEvent, snowSill, treeTrain, wallSpiders } from './seasons.js';
 import { sunTimes } from './sun.js';
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -197,13 +197,6 @@ const TREE = sprite([
 ]);
 // Fairy lights, on a few needles of each tier.
 const TREE_LIGHTS = [[5, 3, 'R'], [4, 6, 'Y'], [6, 7, 'B'], [3, 9, 'Y'], [7, 10, 'R'], [2, 12, 'B'], [5, 12, 'Y'], [8, 13, 'R'], [1, 13, 'Y']];
-const GIFTS = sprite([
-  '..Y....Y..',
-  '.RYR..BYB.',
-  '.RYR..BYB.',
-  'RRYRRBBYBB',
-  'RRYRRBBYBB',
-]);
 
 // Easter Sunday (anonymous Gregorian algorithm).
 function easter(year) {
@@ -224,18 +217,27 @@ function fouerStart(year) {
   return new Date(year, 7, 24 + (back <= 3 ? -back : 7 - back));
 }
 
+// One-day feasts come before the long seasons they fall in.
 export function seasonOf(date) {
   const forced = new URLSearchParams(location.search).get('saison');
   if (forced) return forced;
   const m = date.getMonth();
   const d = date.getDate();
   const day = new Date(date.getFullYear(), m, d);
-  const days = (from, to) => (to - from) / 86_400_000;
+  const days = (from, to) => Math.round((to - from) / 86_400_000);
+  if ((m === 11 && d === 31) || (m === 0 && d === 1)) return 'nouvel-an';
+  if (m === 5 && (d === 22 || d === 23)) return 'fete-lu'; // fireworks on the eve
+  if (m === 6 && d === 14) return 'fete-fr';
+  if (m === 6 && d === 21) return 'fete-be';
+  if (m === 9 && d === 3) return 'fete-de';
   const sinceEaster = days(easter(date.getFullYear()), day);
+  if (sinceEaster === -43 || sinceEaster === -42) return 'buergbrennen'; // first Sunday of Lent and its eve
+  if (sinceEaster >= -52 && sinceEaster <= -47) return 'fuesend'; // Fat Thursday to Shrove Tuesday
   if (sinceEaster >= -10 && sinceEaster <= 1) return 'paques'; // to Easter Monday, the Emaischen
   const sinceFouer = days(fouerStart(date.getFullYear()), day);
   if (sinceFouer >= 0 && sinceFouer < 20) return 'fouer';
   if (m === 9 || (m === 10 && d <= 2)) return 'halloween';
+  if (m === 11 && d <= 6) return 'kleeschen';
   if (m === 11 || (m === 0 && d <= 6)) return 'noel';
   return null;
 }
@@ -266,9 +268,13 @@ function christmasTree(left, base, env, g) {
     },
   });
   glows.push({ draw: lights, x: left + 5.5 * p, y: top + 9 * p, r: 16 });
+  // Presents: a big stack beside the tree, a smaller one in front of its trunk.
+  const [big, small] = TREE_GIFTS;
   const giftsLeft = left + TREE.w * p - 2 * p;
-  props.push({ base: Math.round(base) + 1, draw: (ctx) => drawSprite(ctx, GIFTS, giftsLeft, base - GIFTS.h * p + p, p) });
-  const width = (TREE.w + GIFTS.w - 2) * p;
+  props.push({ base: Math.round(base) + 1, draw: (ctx) => drawSprite(ctx, big, giftsLeft, base - big.h * p + p, p) });
+  const frontLeft = left + p;
+  props.push({ base: Math.round(base) + 2, draw: (ctx) => drawSprite(ctx, small, frontLeft, base - small.h * p + 2 * p, p) });
+  const width = (TREE.w + big.w - 2) * p;
   treeTrain(g, env, left + width / 2, base - p, width / 2 + 3 * p, 4 * p);
 }
 
@@ -1311,14 +1317,15 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
     if (at) pumpkin(at.left, at.base, env);
   }
   if (season === 'noel') {
-    const at = freeSpot(TREE.w * p + GIFTS.w * p, TREE.h * p, wall + u(100), floorBottom - u(4), 200);
+    const at = freeSpot(TREE.w * p + TREE_GIFTS[0].w * p, TREE.h * p, wall + u(100), floorBottom - u(4), 200);
     if (at) christmasTree(at.left, at.base, env, g);
   }
+  const floorArea = { x0: x0 + u(40), x1: x1 - u(40), y0: wall + u(70), y1: floorBottom - u(8) };
   seasonFloor(env, (s) => {
     const at = freeSpot(s.w * p, s.h * p, wall + u(100), floorBottom - u(4), 100);
     return at && { left: at.left, top: at.base - s.h * p };
-  });
-  seasonCritters(env, { x0: x0 + u(40), x1: x1 - u(40), y0: wall + u(70), y1: floorBottom - u(8) });
+  }, g, floorArea);
+  seasonCritters(env, floorArea);
   wallSpiders(env, x0, x1, top, wall);
 
   for (let i = int(2, 5) * sections; i > 0; i--) scatter(look.plant(), wall + u(80), floorBottom - u(4));
@@ -1674,14 +1681,13 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   const seasonSpot = bareGaps.filter((gp) => gp.w >= u(70)).sort((a, b) => b.w - a.w)[0] ?? null;
   seasonWall(g, env, { x0, x1, top, wall, door: sharedDoor === null ? null : { left: sharedDoor, top: wall + u(4) - DOOR.h * p }, spot: seasonSpot });
   // On the floor by the door, clear of the pumpkins or the tree.
-  if (sharedDoor !== null) {
-    const spots = [150, 215, 280, 345].flatMap((d) => [sharedDoor - u(d), sharedDoor + doorWidth(p) + u(d)]);
-    seasonFloor(env, (s) => {
-      const left = spots.shift();
-      return left === undefined ? null : { left, top: wall + u(44) - s.h * p };
-    });
-  }
-  seasonCritters(env, { x0: x0 + u(40), x1: x1 - u(40), y0: wall + u(70), y1: floorBottom - u(8) });
+  const spots = sharedDoor === null ? [] : [150, 215, 280, 345].flatMap((d) => [sharedDoor - u(d), sharedDoor + doorWidth(p) + u(d)]);
+  const floorArea = { x0: x0 + u(40), x1: x1 - u(40), y0: wall + u(70), y1: floorBottom - u(8) };
+  seasonFloor(env, (s) => {
+    const left = spots.shift();
+    return left === undefined ? null : { left, top: wall + u(44) - s.h * p };
+  }, g, floorArea);
+  seasonCritters(env, floorArea);
   wallSpiders(env, x0, x1, top, wall);
 
   // ---- Front walkway, framed by two tall plants.
@@ -1989,8 +1995,14 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
         ctx.fillStyle = glow;
         ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
       }
-      // Pumpkin faces and fairy lights shine through the dark.
+      // Fireworks or a bonfire in the windows, and pumpkin faces and fairy
+      // lights, shine through the dark.
       const now = performance.now();
+      const extra = skyEvent(season);
+      if (extra) {
+        const light = daylight(date);
+        skies.forEach((w, i) => extra(ctx, w, i, light, now, px));
+      }
       for (const g of glows) {
         const r = u(g.r * 5);
         const halo = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, r);

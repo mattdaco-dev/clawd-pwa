@@ -2,6 +2,7 @@
 // is playing, or a body recoloured (ghost sheet, bandages, Christmas jumper).
 // About two Clawds in five wear one, always the same for a given agent.
 import { FRAME_W } from './sprites.js';
+import { FLAGS } from './seasons.js';
 import { PALETTES, drawFrame } from './render.js';
 
 const INK = PALETTES.main;
@@ -119,6 +120,72 @@ const COSTUMES = {
       return cells;
     },
   },
+  // Carnival: lots of them, and a little silly.
+  clown: {
+    season: 'fuesend',
+    hat: (a) => [[-1, a.eyes - a.top + 2, 'R'], [0, a.eyes - a.top + 2, 'R'], [-1, a.eyes - a.top + 1, 'R'], [0, a.eyes - a.top + 1, 'R'],
+      ...hat(['.Y.B.R.', 'YYBBBRR'])()],
+  },
+  jester: {
+    season: 'fuesend',
+    hat: hat([
+      'Y.......Y',
+      'RR.....YY',
+      '.RRR.YYY.',
+      '..RRYYY..',
+      '.RRRYYYY.',
+    ]),
+  },
+  pirate: {
+    season: 'fuesend',
+    hat: hat([
+      '..KKKKK..',
+      '.KKKWKKK.',
+      'KKKKKKKKK',
+    ]),
+  },
+  crown: {
+    seasons: ['fuesend', 'nouvel-an'],
+    hat: hat([
+      'Y..Y..Y',
+      'YY.Y.YY',
+      'YRYBYRY',
+    ]),
+  },
+  mask: { season: 'fuesend', body: (x, y, a) => (y >= a.eyes - 2 && y <= a.eyes ? '#6e4a9e' : null) },
+  // The Kleeschen's mitre, and his dark companion, the Houseker.
+  mitre: {
+    season: 'kleeschen',
+    hat: hat([
+      '...Y...',
+      '..WYW..',
+      '.WWYWW.',
+      '.WYYYW.',
+      '.WWYWW.',
+      '.YYYYY.',
+    ]),
+  },
+  houseker: { season: 'kleeschen', body: () => '#3e322c' },
+  goldHat: {
+    season: 'nouvel-an',
+    hat: hat([
+      '...W...',
+      '...Y...',
+      '..YAY..',
+      '..AYA..',
+      '.YAYAY.',
+      '.AYAYA.',
+    ]),
+  },
+  woolly: {
+    season: 'buergbrennen',
+    hat: hat([
+      '...W...',
+      '.RRRRR.',
+      'RWRWRWR',
+      'WWWWWWW',
+    ]),
+  },
   // A Christmas jumper: red, with a band of green and white below the eyes.
   jumper: {
     season: 'noel',
@@ -130,6 +197,22 @@ const COSTUMES = {
   },
 };
 
+// National days: a little flag waved on a stick beside the head.
+for (const [season, { colors, vertical }] of Object.entries(FLAGS)) {
+  COSTUMES[`flag-${season}`] = {
+    season,
+    hat: (a) => {
+      const pole = a.left - a.cx - 2;
+      const cells = [];
+      for (let y = -6; y < 2; y++) cells.push([pole, y, 'D']);
+      for (let y = 0; y < 3; y++) for (let x = 0; x < 4; x++) cells.push([pole - 4 + x, y - 6, colors[vertical ? Math.min(2, Math.floor(x * 3 / 4)) : y]]);
+      return cells;
+    },
+  };
+}
+// More of them dress up for carnival, everybody waves a flag on a national day.
+const SHARE = { fuesend: 80, 'fete-lu': 50, 'fete-fr': 50, 'fete-be': 50, 'fete-de': 50 };
+
 function hash(text) {
   let h = 2166136261;
   for (const ch of text) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
@@ -140,8 +223,8 @@ function hash(text) {
 export function costumeFor(key, season) {
   if (!season) return null;
   const h = hash(key);
-  if (h % 100 >= 40) return null;
-  const options = Object.values(COSTUMES).filter((c) => c.season === season);
+  if (h % 100 >= (SHARE[season] ?? 40)) return null;
+  const options = Object.values(COSTUMES).filter((c) => c.season === season || c.seasons?.includes(season));
   return options[Math.floor(h / 100) % options.length] ?? null;
 }
 

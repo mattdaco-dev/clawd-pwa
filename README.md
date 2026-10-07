@@ -63,8 +63,16 @@ Pendant la Schueberfouer (20 jours à partir du vendredi le plus proche du 24 ao
 fête foraine sous des fanions aux couleurs du drapeau, affiche de la grande roue, ballons, nounours.
 Environ deux Clawd sur cinq se déguisent selon la saison : chapeau de sorcière, cornes, fantôme,
 momie ; bonnet de Père Noël ou d'elfe, bois de renne, pull de Noël ; oreilles de lapin, poussin,
-couronne de fleurs ; chapeau de fête, canotier, ballon. `/?saison=paques` (ou `fouer`,
-`halloween`, `noel`) pour les voir hors saison, ou le menu de la Démo.
+couronne de fleurs ; chapeau de fête, canotier, ballon. Les fêtes d'un jour passent avant :
+Nouvel An (31 décembre et 1er janvier, cotillons, confettis, feux d'artifice aux fenêtres),
+fêtes nationales luxembourgeoise (22 et 23 juin), française (14 juillet), belge (21 juillet) et
+allemande (3 octobre) avec fanions et drapeau aux couleurs du pays, feux d'artifice et Clawd qui
+agitent un petit drapeau, Fuesend (du jeudi gras au mardi gras : masques, confettis, quatre Clawd
+sur cinq déguisés), Buergbrennen (premier dimanche de Carême et la veille : feux dans les
+fenêtres, bonnets) et Kleeschen (1er au 6 décembre : bottes garnies, Boxemännchen, mitres et
+Houseker). `/?saison=paques` (ou `fouer`, `halloween`, `noel`, `nouvel-an`, `fuesend`,
+`buergbrennen`, `kleeschen`, `fete-lu`, `fete-fr`, `fete-be`, `fete-de`) pour les voir hors
+saison, ou le menu de la Démo. Les cadeaux de Noël s'empilent au pied du sapin et ailleurs.
 
 Un outil qui échoue (`PostToolUseFailure`, hors annulation) fait sursauter son Clawd sous une croix
 rouge. Après 10 min de travail d'affilée, un Clawd au clavier bâille et s'étire de temps en temps, et

@@ -175,7 +175,93 @@ const LITTLE_GHOST = sprite([
 ]);
 const flipped = (s) => ({ ...s, cells: s.cells.map(([x, y, c]) => [s.w - 1 - x, y, c]) });
 
-const PENNANTS = { halloween: ['o', 'K', 'v'], paques: ['q', 'y', 'b', 'l'], fouer: ['R', 'W', 'c'] };
+// National days: the flag's three colours, and whether its bands are vertical.
+export const FLAGS = {
+  'fete-lu': { colors: ['R', 'W', 'c'], vertical: false },
+  'fete-fr': { colors: ['N', 'W', 'R'], vertical: true },
+  'fete-be': { colors: ['K', 'Y', 'R'], vertical: true },
+  'fete-de': { colors: ['K', 'R', 'Y'], vertical: false },
+};
+const flag = ({ colors, vertical }) => sprite(Array.from({ length: 6 }, (_, y) =>
+  Array.from({ length: 9 }, (_, x) => colors[vertical ? Math.floor(x / 3) : Math.floor(y / 2)]).join('')));
+const MASK = sprite([
+  'v.......v',
+  'vvvvvvvvv',
+  'vvKvvvKvv',
+  '.vvvYvvv.',
+  '..v...v..',
+]);
+const BOOT = sprite([
+  '.Y.R.',
+  'YKKKR',
+  '.KKK.',
+  '.KKK.',
+  '.KKKK',
+  'KKKKKK',
+]);
+// The Kleeschen's brioche man, a Boxemännchen.
+const BREAD_MAN = sprite([
+  '..OO..',
+  '.OKOK.',
+  '.OOOO.',
+  'OOOOOO',
+  '.OYOO.',
+  '.OOOO.',
+  '.O..O.',
+]);
+// Presents: rectangular boxes tied with a ribbon and a bow, stacked two or
+// three high, the biggest at the bottom.
+const WRAPS = [['R', 'Y'], ['B', 'W'], ['P', 'R'], ['Y', 'R'], ['v', 'Y'], ['c', 'W'], ['q', 'R'], ['W', 'R']];
+export function giftStack(random, layers = 2 + Math.floor(random() * 2), widest = 9 + Math.floor(random() * 4)) {
+  const boxes = [];
+  let w = widest;
+  for (let i = 0; i < layers && w >= 4; i++) {
+    const h = 3 + Math.floor(random() * 3);
+    boxes.push({ w, h, wrap: WRAPS[Math.floor(random() * WRAPS.length)], shift: i ? Math.floor(random() * 3) - 1 : 0 });
+    w -= 2 + Math.floor(random() * 3);
+  }
+  const width = boxes[0].w;
+  const height = boxes.reduce((sum, b) => sum + b.h, 0) + 2;
+  const grid = Array.from({ length: height }, () => Array(width).fill('.'));
+  let bottom = height;
+  for (const { w: bw, h, wrap: [body, ribbon], shift } of boxes) {
+    const left = Math.max(0, Math.min(width - bw, Math.floor((width - bw) / 2) + shift));
+    const mid = left + Math.floor(bw / 2);
+    for (let y = bottom - h; y < bottom; y++) {
+      for (let x = left; x < left + bw; x++) grid[y][x] = x === mid || y === bottom - h + 1 ? ribbon : body;
+    }
+    bottom -= h;
+  }
+  // The bow on the top box.
+  const top = boxes[boxes.length - 1];
+  const topLeft = Math.max(0, Math.min(width - top.w, Math.floor((width - top.w) / 2) + top.shift));
+  const mid = topLeft + Math.floor(top.w / 2);
+  const bowRow = bottom - 1;
+  for (const dx of [-1, 1]) if (grid[bowRow][mid + dx] !== undefined) grid[bowRow][mid + dx] = top.wrap[1];
+  if (bowRow - 1 >= 0) {
+    if (grid[bowRow - 1][mid - 2] !== undefined) grid[bowRow - 1][mid - 2] = top.wrap[1];
+    if (grid[bowRow - 1][mid + 2] !== undefined) grid[bowRow - 1][mid + 2] = top.wrap[1];
+  }
+  const rows = grid.map((r) => r.join(''));
+  while (rows.length && /^\.+$/.test(rows[0])) rows.shift();
+  return sprite(rows);
+}
+// A fixed pile under every Christmas tree (a seeded sequence, the same each time).
+const pileRandom = (() => {
+  let a = 7;
+  return () => ((a = (a * 16807) % 2147483647) / 2147483647);
+})();
+export const TREE_GIFTS = [giftStack(pileRandom, 3), giftStack(pileRandom, 1, 6)];
+
+const PENNANTS = {
+  halloween: ['o', 'K', 'v'],
+  paques: ['q', 'y', 'b', 'l'],
+  fouer: ['R', 'W', 'c'],
+  fuesend: ['R', 'Y', 'B', 'P', 'q', 'v'],
+  kleeschen: ['R', 'Y'],
+  'nouvel-an': ['Y', 'A', 'W'],
+  ...Object.fromEntries(Object.entries(FLAGS).map(([k, f]) => [k, f.colors])),
+};
 const BULB_COLORS = ['R', 'Y', 'B', 'P'];
 const FAIR_BULBS = ['Y', 'W', 'R', 'Y', 'W', 'c'];
 
@@ -325,6 +411,18 @@ export function seasonWall(g, env, { x0, x1, top, wall, door, spot }) {
         drawSprite(g, EGGS[i + 1], ex, ey, p);
       });
     }
+  } else if (season === 'fuesend' || season === 'kleeschen' || season === 'nouvel-an' || FLAGS[season]) {
+    const special = season === 'fuesend' ? () => MASK : null;
+    env.walls.push((ctx) => pennantGarland(ctx, x0 + u(30), x1 - u(30), top, env, PENNANTS[season], special));
+    if (FLAGS[season] && spot) {
+      // The flag on a little pole.
+      const f = flag(FLAGS[season]);
+      const fx = Math.round(spot.x - (f.w * p) / 2);
+      const fy = Math.round(wall - u(80));
+      g.fillStyle = INK.D;
+      g.fillRect(fx - p, fy, p, u(56));
+      drawSprite(g, f, fx, fy, p);
+    }
   } else if (season === 'fouer') {
     const from = x0 + u(20);
     const to = x1 - u(20);
@@ -344,8 +442,19 @@ export function snowSill(g, left, top, model, p) {
 
 // Things on the floor: a bubbling cauldron, or poinsettias. `place(s)` finds
 // room for a sprite and returns its { left, top }, or null.
-export function seasonFloor(env, place) {
+// Confetti over the floor `area`, painted into the background.
+function confetti(g, area, p, colors) {
+  const n = Math.round(((area.x1 - area.x0) * (area.y1 - area.y0)) / (p * p * 900));
+  for (let i = 0; i < n; i++) {
+    g.fillStyle = INK[colors[i % colors.length]];
+    g.fillRect(Math.round(area.x0 + Math.random() * (area.x1 - area.x0)), Math.round(area.y0 + Math.random() * (area.y1 - area.y0)), p, Math.max(1, p / 2));
+  }
+}
+
+export function seasonFloor(env, place, g, area) {
   const { season, p, props, glows } = env;
+  if (season === 'fuesend') confetti(g, area, p, PENNANTS.fuesend);
+  if (season === 'nouvel-an') confetti(g, area, p, ['Y', 'A', 'W', 'R', 'B']);
   if (season === 'halloween') {
     const at = place(CAULDRON);
     if (at) {
@@ -354,6 +463,7 @@ export function seasonFloor(env, place) {
     }
   } else if (season === 'noel') {
     for (let i = 0; i < 2; i++) put(POINSETTIA);
+    for (let i = 0; i < 2; i++) put(giftStack(Math.random));
   } else if (season === 'paques') {
     put(BASKET);
     put(CHOCOLATE_BUNNY);
@@ -362,6 +472,10 @@ export function seasonFloor(env, place) {
   } else if (season === 'fouer') {
     put(BALLOONS);
     put(TEDDY);
+  } else if (season === 'kleeschen') {
+    put(BOOT);
+    put(BOOT);
+    put(BREAD_MAN);
   }
 
   function put(s) {
@@ -549,4 +663,58 @@ export function treeTrain(g, env, cx, cy, rx, ry) {
       },
     });
   });
+}
+
+// ---- In the windows: fireworks for New Year and national days, the
+// Buergbrennen's bonfire. Drawn on the glass after the sky, at dusk and night.
+
+const FIREWORK_COLORS = ['#ffd84a', '#ff6b6b', '#7fd4ff', '#b9ff8a', '#ffffff', '#ff9ef0'];
+
+function fireworks(ctx, { left, top, model }, index, light, now, p) {
+  if (light.night < 0.6) return;
+  // Two bursts at a time in each window, each with its own rhythm.
+  for (let n = 0; n < 2; n++) {
+    const period = 1700 + ((index + n) % 3) * 350;
+    const clock = now + index * 700 + n * 900;
+    const k = Math.floor(clock / period);
+    const t = (clock % period) / period;
+    const rnd = (m) => {
+      const v = Math.sin(k * 12.9898 + index * 78.233 + n * 19.31 + m * 37.719) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    const cx = 2 + rnd(1) * (model.w - 4);
+    const cy = 1 + rnd(2) * model.h * 0.55;
+    const r = 0.5 + t * (2.5 + rnd(3) * 3);
+    ctx.globalAlpha = Math.min(1, 1.6 * (1 - t));
+    ctx.fillStyle = FIREWORK_COLORS[Math.floor(rnd(4) * FIREWORK_COLORS.length)];
+    for (const [x, y] of model.glass) {
+      const d = Math.hypot(x - cx, y - cy);
+      // A ring of sparks, and the core while it is young.
+      if (Math.abs(d - r) < 0.75 || (t < 0.25 && d < 1)) ctx.fillRect(left + x * p, top + y * p, p, p);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function bonfire(ctx, { left, top, model }, index, light, now, p) {
+  if (light.night < 0.3 && !light.dusk) return;
+  if (index % 2) return; // seen from every other window
+  const bottom = Math.max(...model.glass.map(([, y]) => y));
+  const cx = Math.round(model.w / 2);
+  const flicker = Math.floor(now / 120);
+  for (const [x, y] of model.glass) {
+    const dx = Math.abs(x - cx);
+    const h = bottom - y;
+    // A small cone of flames on the horizon, taller in the middle.
+    if (h > 3 - dx || dx > 3) continue;
+    ctx.fillStyle = (x + y + flicker) % 3 === 0 ? '#ffe066' : (x + flicker) % 2 ? '#ff8a1c' : '#e0441c';
+    ctx.fillRect(left + x * p, top + y * p, p, p);
+  }
+}
+
+// What a window shows for the season, beyond the sky, or null.
+export function skyEvent(season) {
+  if (season === 'nouvel-an' || FLAGS[season]) return fireworks;
+  if (season === 'buergbrennen') return bonfire;
+  return null;
 }
