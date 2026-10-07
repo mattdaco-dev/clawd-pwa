@@ -1936,7 +1936,14 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     // A hallway must serve at least two rooms: the one above, plus a room whose
     // back door opens into it or a neighbour beside it. Otherwise the room above
     // takes the space back. Dropping one can strand another, hence the loop.
-    const touches = (a, b) => (a.x0 === b.x1 + wallT || b.x0 === a.x1 + wallT) && a.top < b.bottom && b.top < a.bottom;
+    // The stretch of a shared side wall where a doorway can go (clear of the
+    // back walls, where the furniture stands), or null if it is too short.
+    const sideSpan = (a, b) => {
+      const low = Math.max(a.hall ? a.top + u(30) : a.top + u(170), b.hall ? b.top + u(30) : b.top + u(170));
+      const high = Math.min(a.bottom, b.bottom) - u(30);
+      return high - low >= u(50) ? { low, high } : null;
+    };
+    const touches = (a, b) => (a.x0 === b.x1 + wallT || b.x0 === a.x1 + wallT) && sideSpan(a, b) !== null;
     for (let dropped = true; dropped; ) {
       dropped = false;
       for (const hall of cells.filter((cell) => cell.hall)) {
@@ -1983,7 +1990,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
       }
     };
     const cellAbove = (x, w, top) => cells.find((cell) => cell.bottom + wallT === top && cell.x0 <= x && x + w <= cell.x1);
-    const rightOf = (cell) => cells.find((other) => other.x0 === cell.x1 + wallT && other.top < cell.bottom && cell.top < other.bottom);
+    const rightOf = (cell) => cells.filter((other) => other.x0 === cell.x1 + wallT && sideSpan(cell, other));
     for (const room of rooms) {
       // The back door, when something lies behind it.
       const doorX = room.x0 + ROOM_DOOR(u) + u(4);
@@ -1992,13 +1999,12 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     }
     for (const cell of cells) {
       const random = seeded(`${seedOf(cell.i)}#${cell.hall ? 'hall' : 'room'}-side`);
-      const next = rightOf(cell);
-      if (next) {
-        // Side doorways stay clear of the back walls, where the furniture stands.
-        const low = Math.max(cell.hall ? cell.top + u(30) : cell.top + u(170), next.hall ? next.top + u(30) : next.top + u(170));
-        const high = Math.min(cell.bottom, next.bottom) - u(30);
+      // A doorway to every neighbour on the right: a room and the hallway
+      // under it each get one.
+      for (const next of rightOf(cell)) {
+        const { low, high } = sideSpan(cell, next);
         const h = Math.min(Math.round(u(50) + u(110) * random()), high - low);
-        if (h >= u(50)) opening(cell.x1, low + random() * (high - low - h), next.x0 - cell.x1, h, false);
+        opening(cell.x1, low + random() * (high - low - h), next.x0 - cell.x1, h, false);
       }
       // A hallway opens onto the room above it, or shows it through glass.
       if (cell.hall && cell.glass) {
