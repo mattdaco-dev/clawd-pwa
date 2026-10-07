@@ -461,8 +461,7 @@ function paintRug(g, cx, cy, w, h, { colors: [border, fill, accent], style }, p)
   }
 }
 
-function paintNameplate(g, name, cx, top) {
-  if (!name) return;
+function paintNameplate(g, { name, cx, top }) {
   g.font = '600 13px ui-monospace, monospace';
   const w = Math.ceil(g.measureText(name).width) + 24;
   g.fillStyle = '#3d3929';
@@ -1038,7 +1037,8 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   const look = dressing(theme, random);
 
   paintArea(g, x0, top, W, bottom - top, wallH, u, theme);
-  paintNameplate(g, name, (x0 + x1) / 2, top - 14); // on the wall above the room, like a door sign
+  // On the wall above the room, like a door sign; drawn last, over windows and furniture.
+  if (name) env.plates.push({ name, cx: (x0 + x1) / 2, top: top - 14 });
 
   const stations = Object.fromEntries(STATIONS.map((type) => [type, []]));
   // perScale and dxPerScale shift the spot with the Clawd's size, so its hands
@@ -1630,7 +1630,8 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   const skies = []; // window panes, repainted with the sky of the hour
   const lamps = [];
   const glows = []; // small lights redrawn over the night tint
-  const env = { p: px, u, props, clocks, skies, lamps, glows, season };
+  const plates = []; // room names, drawn over everything else
+  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates };
   const zones = [];
   let height = viewHeight;
   let background;
@@ -1675,6 +1676,11 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
       if (light.night || light.dusk || weather !== 'clear') {
         skies.forEach((w, i) => drawSky(ctx, w, i, light, px, weather, date.getTime()));
       }
+    },
+    labels(ctx) {
+      ctx.save();
+      for (const plate of plates) paintNameplate(ctx, plate);
+      ctx.restore();
     },
     // Drawn over everything: the evening dims the office, lamps light up around
     // them. Returns how dark it is, so labels can switch to a light ink.

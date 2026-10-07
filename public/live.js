@@ -973,6 +973,8 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       ctx.fillText(critter.label ?? '', Math.round(critter.x), Math.round(critter.y) + 12 + critter.scale);
     }
 
+    office.labels?.(ctx);
+
     if (critters.size === 0) {
       ctx.fillStyle = '#8f8b82';
       ctx.font = '14px system-ui, sans-serif';
