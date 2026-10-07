@@ -148,7 +148,7 @@ export function createDemoBar(root, model, scene, settings) {
         <span class="demo-label">Décor</span>${seg('decor', Object.fromEntries(Object.entries(DECORS).map(([k, d]) => [k, d.label])), current.decor)}
         <span class="demo-label">Disposition</span>${seg('layout', LAYOUTS, current.layout, current.decor === 'none')}
         <span class="demo-label">Pixels</span>${seg('px', Object.fromEntries(PIXEL_SIZES.map((n) => [n, n])), current.px)}
-        <button type="button" data-act="randomize" title="Décor, heure, météo, saison et sessions au hasard">Tout au hasard</button>
+        <button type="button" data-act="randomize" title="Décor, disposition, heure, météo, saison et sessions au hasard ; la taille des pixels ne change pas">Tout au hasard</button>
         <button type="button" data-act="reset" title="Réglages du menu et les trois sessions du scénario">Réinitialiser</button>
         <button type="button" data-act="reseed"${current.decor === 'none' ? ' disabled' : ''}>Régénérer le décor</button>
       </div>
@@ -229,11 +229,12 @@ export function createDemoBar(root, model, scene, settings) {
       applyView();
       model.reset();
     } else if (act === 'randomize') {
-      // Mostly with furniture: the bare decor shows little of the rest.
+      // Mostly with furniture: the bare decor shows little of the rest. The
+      // pixel size stays as it is.
       current = {
+        ...current,
         decor: Math.random() < 0.85 ? 'open-space' : 'none',
         layout: pickOne(Object.keys(LAYOUTS)),
-        px: pickOne(PIXEL_SIZES),
       };
       view = {
         hour: pickOne(HOURS)[0],

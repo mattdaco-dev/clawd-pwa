@@ -28,7 +28,7 @@ inventées, sans Claude Code) et Galerie (toutes les animations regroupées par 
 sa propre barre de réglages : décor, disposition, taille des pixels, heure, météo, saison, un
 bouton pour régénérer le décor, et la liste des sessions. On y ajoute ou ferme des Clawd et des
 sous-agents, on les laisse suivre le scénario en boucle ou on force leur état et leur activité, et
-on déclenche une erreur d'outil. « Tout au hasard » tire une configuration complète, « Réinitialiser »
+on déclenche une erreur d'outil. « Tout au hasard » tire une configuration complète (sauf la taille des pixels), « Réinitialiser »
 revient aux réglages du menu et aux trois sessions du scénario. Le même menu
 porte les réglages, gardés dans le navigateur :
 
