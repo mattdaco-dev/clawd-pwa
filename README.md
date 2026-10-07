@@ -56,7 +56,9 @@ Les fenêtres montrent la météo du moment à Luxembourg (Open-Meteo, sans clé
 d'araignée, fantôme suspendu, chaudron, citrouilles qui s'allument la nuit. De décembre à
 l'Épiphanie, Noël : guirlande lumineuse, couronne sur la porte, chaussettes, neige sur les rebords
 des fenêtres, poinsettias et sapin clignotant. À Pâques (des dix jours avant le dimanche jusqu'à
-l'Emaischen) : guirlande pastel, œufs suspendus, chasse aux œufs, panier et lapin en chocolat.
+l'Emaischen) : guirlande pastel, œufs suspendus, chasse aux œufs, panier, lapin en chocolat et
+lapins de toutes les couleurs qui sautillent. À Halloween, des araignées descendent du plafond ou
+courent au sol et un petit fantôme traverse parfois la pièce ; à Noël, un train tourne autour du sapin.
 Pendant la Schueberfouer (20 jours à partir du vendredi le plus proche du 24 août) : ampoules de
 fête foraine sous des fanions aux couleurs du drapeau, affiche de la grande roue, ballons, nounours.
 Environ deux Clawd sur cinq se déguisent selon la saison : chapeau de sorcière, cornes, fantôme,

@@ -6,7 +6,7 @@
 // Distances below are written for 5 px pixels and scaled by u() to the chosen
 // pixel size, so the whole office zooms with the Clawds.
 import { INK, drawSprite, sprite } from './pixels.js';
-import { seasonFloor, seasonWall, snowSill } from './seasons.js';
+import { seasonCritters, seasonFloor, seasonWall, snowSill, treeTrain, wallSpiders } from './seasons.js';
 import { sunTimes } from './sun.js';
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -247,7 +247,8 @@ function pumpkin(left, base, { p, props, glows }) {
   glows.push({ cells: PUMPKIN_FACE, left, top, p, x: left + 3.5 * p, y: top + 4 * p, r: 10 });
 }
 
-function christmasTree(left, base, { p, props, glows }) {
+function christmasTree(left, base, env, g) {
+  const { p, props, glows } = env;
   const top = base - TREE.h * p;
   const lights = (ctx, now) => {
     const step = Math.floor(now / 600);
@@ -267,6 +268,8 @@ function christmasTree(left, base, { p, props, glows }) {
   glows.push({ draw: lights, x: left + 5.5 * p, y: top + 9 * p, r: 16 });
   const giftsLeft = left + TREE.w * p - 2 * p;
   props.push({ base: Math.round(base) + 1, draw: (ctx) => drawSprite(ctx, GIFTS, giftsLeft, base - GIFTS.h * p + p, p) });
+  const width = (TREE.w + GIFTS.w - 2) * p;
+  treeTrain(g, env, left + width / 2, base - p, width / 2 + 3 * p, 4 * p);
 }
 
 // Window shapes: F is the frame, S the glass repainted with the sky of the hour.
@@ -1309,12 +1312,14 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   }
   if (season === 'noel') {
     const at = freeSpot(TREE.w * p + GIFTS.w * p, TREE.h * p, wall + u(100), floorBottom - u(4), 200);
-    if (at) christmasTree(at.left, at.base, env);
+    if (at) christmasTree(at.left, at.base, env, g);
   }
   seasonFloor(env, (s) => {
     const at = freeSpot(s.w * p, s.h * p, wall + u(100), floorBottom - u(4), 100);
     return at && { left: at.left, top: at.base - s.h * p };
   });
+  seasonCritters(env, { x0: x0 + u(40), x1: x1 - u(40), y0: wall + u(70), y1: floorBottom - u(8) });
+  wallSpiders(env, x0, x1, top, wall);
 
   for (let i = int(2, 5) * sections; i > 0; i--) scatter(look.plant(), wall + u(80), floorBottom - u(4));
   if (chance(0.5)) scatter(CABINET, wall + floor * 0.5, floorBottom - u(4));
@@ -1639,7 +1644,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
         pumpkin(doorLeft - u(8) - PUMPKIN.w * p, wall + u(26), env);
         pumpkin(doorLeft + doorWidth(p) + u(8), wall + u(26), env);
       }
-      if (season === 'noel') christmasTree(doorLeft + doorWidth(p) + u(16), wall + u(30), env);
+      if (season === 'noel') christmasTree(doorLeft + doorWidth(p) + u(16), wall + u(30), env, g);
       wx += u(20) + doorWidth(p) + u(between(40, 90));
       doorX = null;
       continue;
@@ -1676,6 +1681,8 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
       return left === undefined ? null : { left, top: wall + u(44) - s.h * p };
     });
   }
+  seasonCritters(env, { x0: x0 + u(40), x1: x1 - u(40), y0: wall + u(70), y1: floorBottom - u(8) });
+  wallSpiders(env, x0, x1, top, wall);
 
   // ---- Front walkway, framed by two tall plants.
   const entrance = look.tallPlant(); // the same model on both sides

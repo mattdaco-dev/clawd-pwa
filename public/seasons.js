@@ -139,6 +139,42 @@ const TEDDY = sprite([
   '.HHHH.',
   'HH..HH',
 ]);
+// Live bunnies, facing right: sitting, and stretched mid-hop. X is the coat.
+const BUNNY_SIT = [
+  '......XX.',
+  '......XX.',
+  '.....XXXX',
+  '.....XKXX',
+  '.XXXXXXX.',
+  'TXXXXXXX.',
+  '.XXXXXX..',
+  '..X..XX..',
+];
+const BUNNY_HOP = [
+  '.......XX',
+  '......XX.',
+  '.....XXXX',
+  '.XXXXXKXX',
+  'TXXXXXXX.',
+  '.XXXXXX..',
+  'XX.....X.',
+  '.........',
+];
+const COATS = [['W', 'L'], ['H', 'W'], ['G', 'W'], ['O', 'W'], ['D', 'W'], ['A', 'W']];
+const bunny = (rows, coat, tail) => sprite(rows.map((r) => r.replaceAll('X', coat).replaceAll('T', tail)));
+const BUNNIES = COATS.map(([coat, tail]) => ({ sit: bunny(BUNNY_SIT, coat, tail), hop: bunny(BUNNY_HOP, coat, tail) }));
+const SPIDER = [sprite(['K.K.K', '.KKK.', 'K.K.K']), sprite(['.K.K.', 'KKKKK', '.K.K.'])];
+const LITTLE_GHOST = sprite([
+  '.WWWW.',
+  'WWWWWW',
+  'WKWWKW',
+  'WWWWWW',
+  'WWKKWW',
+  'WWWWWW',
+  'W.WW.W',
+]);
+const flipped = (s) => ({ ...s, cells: s.cells.map(([x, y, c]) => [s.w - 1 - x, y, c]) });
+
 const PENNANTS = { halloween: ['o', 'K', 'v'], paques: ['q', 'y', 'b', 'l'], fouer: ['R', 'W', 'c'] };
 const BULB_COLORS = ['R', 'Y', 'B', 'P'];
 const FAIR_BULBS = ['Y', 'W', 'R', 'Y', 'W', 'c'];
@@ -332,4 +368,185 @@ export function seasonFloor(env, place) {
     const at = place(s);
     if (at) props.push({ base: Math.round(at.top + s.h * p), draw: (ctx) => drawSprite(ctx, s, at.left, at.top, p) });
   }
+}
+
+// ---- Things that move: drawn by props whose base follows them, so they sort
+// with the furniture and the Clawds.
+
+// Wanders the floor `area` ({ x0, x1, y0, y1 }): goes somewhere close, waits,
+// goes again. `step(dt)` advances it; x, y are its feet.
+function wanderer(area, { reach, speed, rest }) {
+  const w = {
+    x: area.x0 + Math.random() * (area.x1 - area.x0),
+    y: area.y0 + Math.random() * (area.y1 - area.y0),
+    dir: Math.random() < 0.5 ? 1 : -1,
+    moving: false,
+    travelled: 0,
+    until: 0,
+    last: 0,
+    tx: 0,
+    ty: 0,
+    step(now) {
+      const dt = Math.min(0.1, (now - (w.last || now)) / 1000);
+      w.last = now;
+      if (!w.moving) {
+        if (now < w.until) return;
+        w.tx = Math.min(area.x1, Math.max(area.x0, w.x + (Math.random() * 2 - 1) * reach));
+        w.ty = Math.min(area.y1, Math.max(area.y0, w.y + (Math.random() * 2 - 1) * reach * 0.5));
+        w.dir = w.tx >= w.x ? 1 : -1;
+        w.moving = true;
+        return;
+      }
+      const dx = w.tx - w.x;
+      const dy = w.ty - w.y;
+      const dist = Math.hypot(dx, dy);
+      const move = speed * dt;
+      if (dist <= move) {
+        w.x = w.tx;
+        w.y = w.ty;
+        w.moving = false;
+        w.until = now + rest[0] + Math.random() * (rest[1] - rest[0]);
+        return;
+      }
+      w.x += (dx / dist) * move;
+      w.y += (dy / dist) * move;
+      w.travelled += move;
+    },
+  };
+  return w;
+}
+
+function bunnies(env, area, n) {
+  const { p, u, props } = env;
+  for (let i = 0; i < n; i++) {
+    const look = BUNNIES[Math.floor(Math.random() * BUNNIES.length)];
+    const w = wanderer(area, { reach: u(160), speed: u(70), rest: [1200, 5000] });
+    const hopLen = u(22);
+    props.push({
+      get base() { return Math.round(w.y); },
+      draw(ctx) {
+        w.step(performance.now());
+        // Hops: up and down along the way, sitting between two.
+        const phase = (w.travelled % hopLen) / hopLen;
+        const up = w.moving ? Math.sin(Math.PI * phase) * u(8) : 0;
+        const s = w.moving && phase > 0.15 && phase < 0.85 ? look.hop : look.sit;
+        const shown = w.dir < 0 ? flipped(s) : s;
+        ctx.fillStyle = 'rgb(61 57 41 / 0.1)';
+        ctx.fillRect(Math.round(w.x - 3 * p), Math.round(w.y), 6 * p, p);
+        drawSprite(ctx, shown, w.x - (s.w * p) / 2, w.y - s.h * p - up, p);
+      },
+    });
+  }
+}
+
+function floorSpiders(env, area, n) {
+  const { p, u, props } = env;
+  for (let i = 0; i < n; i++) {
+    const w = wanderer(area, { reach: u(140), speed: u(90), rest: [300, 2500] });
+    props.push({
+      get base() { return Math.round(w.y); },
+      draw(ctx) {
+        const now = performance.now();
+        w.step(now);
+        const s = SPIDER[w.moving ? Math.floor(now / 90) % 2 : 0];
+        drawSprite(ctx, s, w.x - (s.w * p) / 2, w.y - s.h * p, p);
+      },
+    });
+  }
+}
+
+// A spider letting itself down on its thread from the ceiling, waiting, and
+// climbing back up.
+function threadSpider(env, x, top, low) {
+  const { p } = env;
+  const cycle = 14000 + Math.random() * 10000;
+  const offset = Math.random() * cycle;
+  env.walls.push((ctx, now) => {
+    const t = ((now + offset) % cycle) / cycle;
+    // Down in the first quarter, hangs, back up in the third, then stays out of sight.
+    const depth = t < 0.25 ? t / 0.25 : t < 0.55 ? 1 : t < 0.8 ? 1 - (t - 0.55) / 0.25 : 0;
+    if (depth <= 0) return;
+    const y = Math.round(top + depth * (low - top));
+    ctx.fillStyle = 'rgb(90 86 80 / 0.7)';
+    ctx.fillRect(Math.round(x), top, Math.max(1, p / 2), y - top);
+    const s = SPIDER[t > 0.25 && t < 0.55 ? 0 : Math.floor(now / 120) % 2];
+    drawSprite(ctx, s, x - 2 * p, y, p);
+  });
+}
+
+// Now and then a little ghost drifts across the room, over everything, and fades.
+function driftingGhost(env, area) {
+  const { p, u, props } = env;
+  const ghost = { start: performance.now() + 5000 + Math.random() * 20000, dir: 1, y: 0 };
+  const span = area.x1 - area.x0 + u(80);
+  const ms = (span / u(45)) * 1000;
+  props.push({
+    base: 1e9,
+    draw(ctx) {
+      const now = performance.now();
+      if (now < ghost.start) return;
+      const t = (now - ghost.start) / ms;
+      if (t >= 1) {
+        ghost.start = now + 25000 + Math.random() * 50000;
+        ghost.dir = Math.random() < 0.5 ? 1 : -1;
+        ghost.y = area.y0 - u(40) + Math.random() * (area.y1 - area.y0) * 0.6;
+        return;
+      }
+      if (!ghost.y) ghost.y = area.y0 - u(40) + Math.random() * (area.y1 - area.y0) * 0.6;
+      const x = ghost.dir > 0 ? area.x0 - u(40) + t * span : area.x1 + u(40) - t * span;
+      const y = ghost.y + Math.sin(now / 400) * u(6);
+      ctx.save();
+      ctx.globalAlpha = 0.75 * Math.min(1, t * 6, (1 - t) * 6);
+      drawSprite(ctx, ghost.dir > 0 ? LITTLE_GHOST : flipped(LITTLE_GHOST), x, y, p);
+      ctx.restore();
+    },
+  });
+}
+
+// Animals for the season, on the floor `area` of a room or of the open space.
+export function seasonCritters(env, area) {
+  const { season, u } = env;
+  if (season === 'paques') bunnies(env, area, 2 + Math.floor(Math.random() * 2));
+  else if (season === 'halloween') {
+    floorSpiders(env, area, 2);
+    driftingGhost(env, area);
+  }
+}
+
+// Spiders on their threads along a wall (Halloween).
+export function wallSpiders(env, x0, x1, top, wall) {
+  if (env.season !== 'halloween') return;
+  const { u } = env;
+  for (let i = 0; i < 2; i++) threadSpider(env, x0 + u(60) + Math.random() * (x1 - x0 - u(120)), top, wall - u(20) - Math.random() * u(40));
+}
+
+// A toy train running round the Christmas tree and its presents: the track on
+// the floor, three cars sorted with the tree as they pass behind or in front.
+export function treeTrain(g, env, cx, cy, rx, ry) {
+  const { p, props } = env;
+  g.fillStyle = INK.G;
+  for (let a = 0; a < Math.PI * 2; a += 0.12) {
+    g.fillRect(Math.round(cx + rx * Math.cos(a)), Math.round(cy + ry * Math.sin(a)), p, Math.max(1, p / 2));
+  }
+  const cars = [['R', 4], ['B', 3], ['Y', 3]];
+  cars.forEach(([color, w], k) => {
+    const at = () => {
+      const a = performance.now() / 1600 - k * 0.42;
+      return { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) };
+    };
+    props.push({
+      get base() { return Math.round(at().y + p); },
+      draw(ctx) {
+        const { x, y } = at();
+        const left = Math.round(x - (w * p) / 2);
+        const top = Math.round(y - 3 * p);
+        ctx.fillStyle = INK[color];
+        ctx.fillRect(left, top, w * p, 2 * p);
+        if (k === 0) ctx.fillRect(left + p, top - p, p, p); // chimney
+        ctx.fillStyle = INK.K;
+        ctx.fillRect(left, top + 2 * p, p, p);
+        ctx.fillRect(left + (w - 1) * p, top + 2 * p, p, p);
+      },
+    });
+  });
 }
