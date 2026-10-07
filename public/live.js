@@ -5,6 +5,7 @@ import { daylight, drawLight, lightLevel, seasonOf } from './office.js';
 import { currentWeather } from './weather.js';
 import { costumeFor, drawDressed } from './costumes.js';
 import { Cat } from './cat.js';
+import { drawCloud, isCloud } from './cloud.js';
 import { worldOfDay } from './outdoors.js';
 
 // Subagents are drawn one pixel size smaller than their main agent (at 1, both are 1).
@@ -349,6 +350,7 @@ class Critter {
       ctx.ellipse(x, y, 7.5 * this.scale, 1.6 * this.scale, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (isCloud(this.label)) return drawCloud(ctx, this.anim, now - this.t0, x, y, this.scale, this.dir < 0);
     const left = Math.round(this.x - CENTER * this.scale);
     drawDressed(ctx, frame, left, y - FEET * this.scale, this.scale, PALETTES[this.kind], this.dir < 0, this.costume);
   }
