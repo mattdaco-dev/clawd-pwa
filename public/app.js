@@ -1,4 +1,5 @@
 import { DECORS, DEFAULT_SETTINGS, LAYOUTS, PIXEL_SIZES } from './decor.js';
+import { createDemoBar, createDemoModel } from './demo.js';
 import { createGallery } from './gallery.js';
 import { createLive } from './live.js';
 
@@ -13,7 +14,9 @@ if (!(settings.layout in LAYOUTS)) settings.layout = DEFAULT_SETTINGS.layout;
 if (!PIXEL_SIZES.includes(settings.px)) settings.px = DEFAULT_SETTINGS.px;
 
 const live = createLive(document.getElementById('live'), { settings });
-const demo = createLive(document.getElementById('demo'), { demo: true, settings });
+const demoModel = createDemoModel();
+const demo = createLive(document.getElementById('demo'), { demo: demoModel, settings });
+const demoBar = createDemoBar(document.getElementById('demo'), demoModel, demo, settings);
 const views = {
   live,
   demo,
@@ -45,7 +48,7 @@ for (const input of menu.querySelectorAll('.setting input')) {
   input.addEventListener('change', () => {
     settings = { ...settings, [input.name]: input.name === 'px' ? Number(input.value) : input.value };
     live.setSettings(settings);
-    demo.setSettings(settings);
+    demoBar.setSettings(settings);
     renderSettings();
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));

@@ -14,11 +14,13 @@ const MAX_TRIP = 3; // seconds; long trips walk faster
 const SLEEP_AFTER = 120_000;
 const SLEEP_AFTER_NIGHT = 30_000; // from 20:00 to 7:00
 
-// The scene's clock: local time, or a fixed hour from `?heure=22` to try the night.
-const forcedHour = new URLSearchParams(location.search).get('heure');
-function sceneDate() {
+// The scene's clock: local time, or a fixed hour from `?heure=22` (or the demo
+// bar) to try the night. Fractions of an hour are minutes: 19.5 is 19:30.
+const urlHour = new URLSearchParams(location.search).get('heure');
+const forcedHour = urlHour !== null && Number.isFinite(Number(urlHour)) ? Number(urlHour) : null;
+function sceneDate(hour = forcedHour) {
   const date = new Date();
-  if (forcedHour !== null && Number.isFinite(Number(forcedHour))) date.setHours(Number(forcedHour), 0);
+  if (hour !== null) date.setHours(Math.floor(hour), Math.round((hour % 1) * 60));
   return date;
 }
 
@@ -780,26 +782,9 @@ function agentsOf(snapshot) {
   return agents;
 }
 
-// Scripted sessions for trying the scene without Claude Code.
-function demoSnapshot(seconds) {
-  const sub = (id, type, state, activity) => ({ id, type, state, activity });
-  const steps = [
-    { state: 'idle', activity: null, subs: [] },
-    { state: 'working', activity: 'think', subs: [] },
-    { state: 'working', activity: 'think', subs: [sub('a1', 'Explore', 'working', 'search')] },
-    { state: 'waiting', activity: 'flag', subs: [sub('a1', 'Explore', 'working', 'web'), sub('a2', 'general-purpose', 'working', 'type')] },
-    { state: 'working', activity: 'type', subs: [sub('a2', 'general-purpose', 'waiting', 'bubble')] },
-    { state: 'idle', activity: null, subs: [] },
-  ];
-  const session = (id, name, offset) => {
-    const { state, activity, subs } = steps[(Math.floor(seconds / 8) + offset) % steps.length];
-    return { id, name, state, activity, subagents: subs.map((s) => ({ ...s, id: `${id}-${s.id}` })) };
-  };
-  return { sessions: [session('demo', 'démo', 0), session('api', 'api', 3), session('web', 'web', 1)] };
-}
-
-// One scene: fed by the server snapshots, or by the scripted demo when `demo` is set.
-export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } = {}) {
+// One scene: fed by the server snapshots, or by a demo model (see demo.js) when
+// `demo` is set.
+export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = {}) {
   root.innerHTML = `
     <div class="stage"><canvas></canvas></div>
     <div class="live-bar"><span class="status" data-state="off">hors ligne</span></div>`;
@@ -821,6 +806,9 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
   let raf = 0;
   let last = performance.now();
   const demoStart = performance.now();
+  // Overrides from the demo bar: a fixed hour, weather or season ('auto' keeps
+  // the real one) and a salt that redraws the decor.
+  let view = { hour: forcedHour, weather: 'auto', season: 'auto', salt: '' };
 
   function resize() {
     width = stage.clientWidth;
@@ -830,7 +818,7 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
   function renderStatus() {
     if (demo) {
       status.dataset.state = 'demo';
-      status.textContent = 'démo · 3 sessions, scénario en boucle de 48 s';
+      status.textContent = demo.describe();
       return;
     }
     const n = snapshot.sessions.length;
@@ -842,11 +830,11 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
   function ensureOffice(sessions) {
     const names = sessions.map((s) => s.name || s.id.slice(0, 8));
     const { decor, layout, px } = settings;
-    const season = seasonOf(sceneDate());
-    const key = `${decor}|${layout}|${px}|${season}|${width}x${viewHeight}|${names.join('|')}`;
+    const season = view.season === 'auto' ? seasonOf(sceneDate(view.hour)) : view.season;
+    const key = `${decor}|${layout}|${px}|${season}|${view.salt}|${width}x${viewHeight}|${names.join('|')}`;
     if (key === officeKey) return;
     officeKey = key;
-    office = (DECORS[decor] ?? DECORS[DEFAULT_SETTINGS.decor]).build(width, viewHeight, names, { layout, px, season });
+    office = (DECORS[decor] ?? DECORS[DEFAULT_SETTINGS.decor]).build(width, viewHeight, names, { layout, px, season, salt: view.salt });
     height = office.height;
     ctx = fitCanvas(canvas, width, height);
     for (const critter of critters.values()) {
@@ -899,7 +887,7 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
   function tick(now) {
     const dt = Math.min(now - last, 100);
     last = now;
-    const current = demo ? demoSnapshot(Math.max(0, now - demoStart) / 1000) : snapshot;
+    const current = demo ? demo.snapshot(Math.max(0, now - demoStart) / 1000) : snapshot;
     ensureOffice(current.sessions);
     const agents = agentsOf(current);
 
@@ -938,9 +926,9 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
       if (critter.dead) critters.delete(key);
     }
 
-    const date = sceneDate();
+    const date = sceneDate(view.hour);
     ctx.drawImage(office.background, 0, 0, width, height);
-    office.overlay(ctx, date, currentWeather());
+    office.overlay(ctx, date, view.weather === 'auto' ? currentWeather() : view.weather);
 
     // Furniture and Clawds back to front, so whoever stands lower is drawn over the rest.
     const scene = [
@@ -1012,5 +1000,9 @@ export function createLive(root, { demo = false, settings = DEFAULT_SETTINGS } =
     setSettings(next) {
       settings = next;
     },
+    setView(next) {
+      view = { ...view, ...next };
+    },
+    refreshStatus: renderStatus,
   };
 }

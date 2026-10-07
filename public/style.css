@@ -158,6 +158,114 @@ body {
   font-size: 13px;
 }
 
+.demo-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.demo-label {
+  color: var(--muted);
+}
+
+.demo-bar button,
+.demo-bar select {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.demo-bar button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.demo-bar button:disabled,
+.demo-seg:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.demo-seg {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.demo-seg label {
+  cursor: pointer;
+}
+
+.demo-seg input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.demo-seg span {
+  display: block;
+  padding: 3px 9px;
+}
+
+.demo-seg label + label span {
+  border-left: 1px solid var(--line);
+}
+
+.demo-seg input:checked + span {
+  background: var(--accent);
+  color: #fff;
+}
+
+.demo-seg input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.demo-agent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.demo-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 8px;
+  border-radius: 6px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.demo-sub button,
+.demo-sub select {
+  padding: 1px 6px;
+  font-size: 12px;
+}
+
 .status::before {
   content: "";
   display: inline-block;

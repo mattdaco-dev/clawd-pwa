@@ -23,8 +23,12 @@ Le service écrit le chemin absolu de `node` dans le plist (launchd ne voit pas 
 `install-service.py` après un changement de version de Node. Journal du serveur : `logs/server.log`.
 
 Ouvrir http://localhost:4777 dans Chrome, puis « Installer l'application » pour en faire une PWA.
-Le bouton rond en haut à gauche ouvre le menu : Live (les vraies sessions), Démo (un scénario en
-boucle sans Claude Code) et Galerie (toutes les animations regroupées par activité). Le même menu
+Le bouton rond en haut à gauche ouvre le menu : Live (les vraies sessions), Démo (des sessions
+inventées, sans Claude Code) et Galerie (toutes les animations regroupées par activité). La Démo a
+sa propre barre de réglages : décor, disposition, taille des pixels, heure, météo, saison, un
+bouton pour régénérer le décor, et la liste des sessions. On y ajoute ou ferme des Clawd et des
+sous-agents, on les laisse suivre le scénario en boucle ou on force leur état et leur activité, et
+on déclenche une erreur d'outil. Le même menu
 porte les réglages, gardés dans le navigateur :
 
 - Décor : aucun ou open space (la plage viendra ensuite).
@@ -66,6 +70,7 @@ clair. Le hook est déclaré `async`, il ne bloque jamais Claude : sortie vide, 
 - `public/sprites.js` : toutes les animations, en grilles de pixels composées par code.
 - `public/live.js` : la scène plein écran (vues Live et Démo), `public/gallery.js` : la galerie.
 - `public/weather.js` : la météo affichée aux fenêtres.
+- `public/demo.js` : les sessions inventées de la Démo et sa barre de réglages.
 - `public/decor.js` : le registre des décors ; un décor fournit le fond, une zone par session avec ses
   postes, les meubles triés en profondeur avec les Clawd et un calque redessiné à chaque image.
 - `public/office.js` : le décor open space (salles ou bureau partagé, aménagement tiré au hasard par

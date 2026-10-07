@@ -1317,7 +1317,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   const wall = top + wallH;
   const floorBottom = bottom - Math.max(20, u(28));
   // Redecorated once a day.
-  const random = seeded(`shared-office ${new Date().toDateString()}`);
+  const random = seeded(`${env.salt}shared-office ${new Date().toDateString()}`);
   const between = (a, b) => a + random() * (b - a);
   const int = (a, b) => Math.floor(between(a, b + 1));
   const pickOne = (list) => list[Math.floor(random() * list.length)];
@@ -1738,7 +1738,7 @@ function canvasFor(width, height) {
 
 // Rooms: one fixed-size room per session, laid out in a grid that grows
 // downwards (the page scrolls). Shared: one office the size of the window.
-export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms', season = null } = {}) {
+export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms', season = null, salt = '' } = {}) {
   const k = px / 5;
   const u = (n) => Math.round(n * k);
   const props = [];
@@ -1747,7 +1747,9 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   const lamps = [];
   const glows = []; // small lights redrawn over the night tint
   const plates = []; // room names, drawn over everything else
-  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates };
+  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates, salt };
+  // Seeds come from the session names; a salt gives the same names another layout.
+  const seedOf = (i) => `${salt}${names[i] ?? ''}`;
   const zones = [];
   let height = viewHeight;
   let background;
@@ -1755,7 +1757,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   if (layout === 'shared') {
     ({ canvas: background } = canvasFor(width, height));
     const g = background.getContext('2d');
-    const area = { x0: 0, x1: width, top: 0, bottom: height, name: '', seed: 'shared', maxPerRow: 8, maxRows: 4 };
+    const area = { x0: 0, x1: width, top: 0, bottom: height, name: '', seed: `${salt}shared`, maxPerRow: 8, maxRows: 4 };
     // The designed plan needs room for its three zones; narrow windows keep the generic one.
     zones.push(width >= u(1300) && height >= u(700) ? furnishShared(g, area, env) : furnish(g, area, env));
   } else {
@@ -1770,7 +1772,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     const n = Math.max(1, names.length);
     const cols = Math.max(1, Math.floor((width - margin - wallT) / (roomMax + wallT)));
     const rows = Math.ceil(n / cols);
-    const vary = (i, key, low) => low + (1 - low) * seeded(`${names[i] ?? ''}#${key}`)();
+    const vary = (i, key, low) => low + (1 - low) * seeded(`${seedOf(i)}#${key}`)();
     const widths = Array.from({ length: n }, (_, i) => Math.round(roomMax * vary(i, 'w', 0.84)));
     const tall = u(800);
     const inRow = (r) => Array.from({ length: Math.min(cols, n - r * cols) }, (_, k) => r * cols + k);
@@ -1843,9 +1845,9 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     frame(px, WALL_EDGE);
     for (const room of rooms) {
       const { x0, x1, top, bottom, i } = room;
-      zones[i] = furnish(g, { x0, x1, top, bottom, name: names[i] ?? '', seed: `${names[i] ?? ''}#${i}`, maxPerRow: 3, maxRows: 2 }, env);
+      zones[i] = furnish(g, { x0, x1, top, bottom, name: names[i] ?? '', seed: `${seedOf(i)}#${i}`, maxPerRow: 3, maxRows: 2 }, env);
     }
-    for (const hall of cells.filter((cell) => cell.hall)) paintHall(g, hall, `${names[hall.i] ?? ''}#hall`, env);
+    for (const hall of cells.filter((cell) => cell.hall)) paintHall(g, hall, `${seedOf(hall.i)}#hall`, env);
 
     // A gap through a wall: the threshold, edged on the two sides you walk past.
     const opening = (x, y, w, h, across) => {
@@ -1869,7 +1871,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
       if (cellAbove(doorX, doorW, room.top)) opening(doorX, room.top - wallT - px, doorW, wallT + px, true);
     }
     for (const cell of cells) {
-      const random = seeded(`${names[cell.i] ?? ''}#${cell.hall ? 'hall' : 'room'}-side`);
+      const random = seeded(`${seedOf(cell.i)}#${cell.hall ? 'hall' : 'room'}-side`);
       const next = rightOf(cell);
       if (next) {
         // Side doorways stay clear of the back walls, where the furniture stands.
