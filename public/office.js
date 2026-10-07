@@ -1811,6 +1811,22 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
       rowTop += rowH + wallT;
     }
     cells.unshift(...rooms);
+    // A hallway must serve at least two rooms: the one above, plus a room whose
+    // back door opens into it or a neighbour beside it. Otherwise the room above
+    // takes the space back. Dropping one can strand another, hence the loop.
+    const touches = (a, b) => (a.x0 === b.x1 + wallT || b.x0 === a.x1 + wallT) && a.top < b.bottom && b.top < a.bottom;
+    for (let dropped = true; dropped; ) {
+      dropped = false;
+      for (const hall of cells.filter((cell) => cell.hall)) {
+        const below = rooms.filter((room) => room.top === hall.bottom + wallT &&
+          hall.x0 <= room.x0 + ROOM_DOOR(u) && room.x0 + ROOM_DOOR(u) + doorWidth(px) <= hall.x1);
+        const beside = cells.filter((cell) => cell !== hall && touches(cell, hall));
+        if (1 + below.length + beside.length >= 2) continue;
+        rooms.find((room) => room.i === hall.i).bottom = hall.bottom;
+        cells.splice(cells.indexOf(hall), 1);
+        dropped = true;
+      }
+    }
     const planBottom = Math.max(...cells.map((cell) => cell.bottom));
     height = Math.max(viewHeight, planBottom + wallT + u(64));
     const { canvas, g } = canvasFor(width, height);
