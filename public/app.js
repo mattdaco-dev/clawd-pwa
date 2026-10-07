@@ -12,6 +12,9 @@ try {
 if (!(settings.decor in DECORS)) settings.decor = DEFAULT_SETTINGS.decor;
 if (!(settings.layout in LAYOUTS)) settings.layout = DEFAULT_SETTINGS.layout;
 if (!PIXEL_SIZES.includes(settings.px)) settings.px = DEFAULT_SETTINGS.px;
+const canNotify = 'Notification' in window && 'serviceWorker' in navigator;
+if (!canNotify || Notification.permission !== 'granted') settings.notify = 'off';
+document.querySelector('[data-notify]').hidden = !canNotify;
 
 const live = createLive(document.getElementById('live'), { settings });
 const demoModel = createDemoModel();
@@ -45,7 +48,11 @@ function renderSettings() {
 }
 
 for (const input of menu.querySelectorAll('.setting input')) {
-  input.addEventListener('change', () => {
+  input.addEventListener('change', async () => {
+    // The browser asks once; refused, the setting falls back to « Non ».
+    if (input.name === 'notify' && input.value === 'on' && Notification.permission !== 'granted') {
+      if ((await Notification.requestPermission()) !== 'granted') return renderSettings();
+    }
     settings = { ...settings, [input.name]: input.name === 'px' ? Number(input.value) : input.value };
     live.setSettings(settings);
     demoBar.setSettings(settings);
@@ -86,16 +93,50 @@ events.onmessage = (e) => {
   showWaiting(snapshot);
 };
 
+const WAIT_REASONS = {
+  AskUserQuestion: 'a une question',
+  ExitPlanMode: 'a un plan à valider',
+};
+let waitingBefore = null; // keys of the agents waiting at the last snapshot
+
 // Agents waiting for an input are the only ones that need you: count them in
-// the tab title and on the installed app's icon.
+// the tab title and on the installed app's icon, and notify the new ones when
+// the PWA is not in front.
 function showWaiting(snapshot) {
-  const n = snapshot.sessions
-    .flatMap((s) => [s, ...s.subagents])
-    .filter((a) => a.state === 'waiting').length;
+  const waiting = snapshot.sessions.flatMap((s) => [
+    ...(s.state === 'waiting' ? [{ key: s.id, name: s.name || s.id.slice(0, 8), agent: s }] : []),
+    ...s.subagents.filter((a) => a.state === 'waiting').map((a) => ({ key: `${s.id}/${a.id}`, name: `${a.type} (${s.name})`, agent: a })),
+  ]);
+  const n = waiting.length;
+  const keys = new Set(waiting.map((w) => w.key));
+  // Nothing on the first snapshot: those were already waiting before the page opened.
+  if (waitingBefore) {
+    for (const w of waiting) if (!waitingBefore.has(w.key)) notify(w);
+    for (const key of waitingBefore) if (!keys.has(key)) unnotify(key);
+  }
+  waitingBefore = keys;
   document.title = n ? `(${n}) Clawd` : 'Clawd';
   try {
     if (n) navigator.setAppBadge?.(n)?.catch(() => {});
     else navigator.clearAppBadge?.()?.catch(() => {});
+  } catch {}
+}
+
+async function notify({ key, name, agent }) {
+  if (settings.notify !== 'on' || Notification.permission !== 'granted') return;
+  if (document.visibilityState === 'visible' && document.hasFocus()) return;
+  const reason = WAIT_REASONS[agent.tool] ?? (agent.tool ? `demande à utiliser ${agent.tool}` : 'attend ta réponse');
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    await registration.showNotification(`${name} ${reason}`, { tag: key, icon: '/icons/icon-192.png', body: 'Claude Code attend un input.' });
+  } catch {}
+}
+
+// Answered elsewhere: the notification is no longer news.
+async function unnotify(key) {
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    for (const n of await registration.getNotifications({ tag: key })) n.close();
   } catch {}
 }
 

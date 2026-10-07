@@ -4,6 +4,7 @@ import { DECORS, DEFAULT_SETTINGS } from './decor.js';
 import { daylight, drawLight, seasonOf } from './office.js';
 import { currentWeather } from './weather.js';
 import { costumeFor, drawDressed } from './costumes.js';
+import { Cat } from './cat.js';
 
 // Subagents are drawn one pixel size smaller than their main agent (at 1, both are 1).
 const scaleFor = (kind, px) => (kind === 'main' ? px : Math.max(1, px - 1));
@@ -70,6 +71,7 @@ const CHAT_GAP = 12; // sprite pixels from the middle of the counter to each Cla
 const CHAT_TURNS = [5, 9]; // lines before they go back to their business
 const CHAT_MS = [1800, 3000]; // how long one of them speaks
 const HEAD = 10; // sprite pixels from the feet to the top of the head
+const REACTION_TTL = 10_000; // a commit or a test run seen later than that is old news
 
 // What a Clawd says over a coffee, one 7x5 picture per bubble.
 const SAYINGS = [
@@ -190,10 +192,17 @@ class Critter {
     this.locked = false;
 
     // A tool just failed: a one-off « oops », unless busy walking or playing.
-    if (this.errorSeen === undefined) this.errorSeen = agent.errorAt;
+    if (this.errorSeen === undefined) this.errorSeen = agent.errorAt ?? null;
     if (agent.errorAt && agent.errorAt !== this.errorSeen) {
       this.errorSeen = agent.errorAt;
       if (!this.target && !this.duo) return this.play('oops', 1, true);
+    }
+
+    // A commit or a test run just ended: its own reaction, once free to play it.
+    if (this.reactionSeen === undefined) this.reactionSeen = agent.reaction?.at ?? null;
+    if (agent.reaction && agent.reaction.at !== this.reactionSeen && !this.target && !this.duo) {
+      this.reactionSeen = agent.reaction.at;
+      if (Date.now() - agent.reaction.at < REACTION_TTL) return this.play(agent.reaction.kind, 1, true);
     }
 
     // On a coffee break, new tools do not call it back to work; only a change of state does.
@@ -203,6 +212,7 @@ class Critter {
       this.duo?.quit(this);
       this.replan = false; // decided right below
       const wasWorking = this.state === 'working';
+      if (agent.state !== this.state) this.stateSince = agent.since ?? Date.now();
       this.state = agent.state;
       this.activity = agent.activity;
       if (agent.state === 'idle') {
@@ -257,7 +267,8 @@ class Critter {
 
     this.release();
     if (plan.station) {
-      this.slot = zone.stations[plan.station]?.find((s) => !s.occupant) ?? null;
+      const free = zone.stations[plan.station]?.filter((s) => !s.occupant) ?? [];
+      this.slot = this.nearParent(free) ?? free[0] ?? null;
       if (this.slot) this.slot.occupant = this;
     }
     if (this.slot) return this.walkTo(this.slot.spot(this.scale), zone);
@@ -274,6 +285,18 @@ class Critter {
     if (typing && this.workingSince && performance.now() - this.workingSince > STRETCH_AFTER && Math.random() < STRETCH_CHANCE) name = 'stretch';
     if (this.slot) this.dir = this.slot.dir;
     this.play(name, name === 'sleep' ? Infinity : name === 'breathe' || name === 'stretch' ? 1 : CYCLES[this.state]);
+  }
+
+  // A subagent takes the free place closest to its main agent, wherever that one is headed.
+  nearParent(free) {
+    const parent = this.parent;
+    if (!parent || parent.leaving || parent.zone !== this.zone || !free.length) return null;
+    const at = parent.slot?.spot(parent.scale) ?? parent.target ?? parent;
+    const dist = (s) => {
+      const spot = s.spot(this.scale);
+      return Math.hypot(spot.x - at.x, spot.y - at.y);
+    };
+    return free.reduce((best, s) => (dist(s) < dist(best) ? s : best));
   }
 
   walkTo(spot, zone) {
@@ -770,13 +793,58 @@ function nearbySpot(critter, zone) {
   return { x: critter.x + Math.cos(angle) * dist, y: clamp(critter.y + Math.sin(angle) * dist * 0.6, zone.y0, zone.y1) };
 }
 
+// The card shown when a Clawd is clicked.
+const STATE_LABELS = { working: 'Travaille', waiting: 'Attend un input', idle: 'Au repos' };
+const ACTIVITY_LABELS = {
+  type: 'écrit',
+  search: 'lit, cherche',
+  web: 'sur le web',
+  think: 'réfléchit',
+  compact: 'compacte le contexte',
+  flag: 'demande une permission',
+  bubble: 'attend une réponse',
+};
+const esc = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+function duration(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`;
+}
+
+function cardHtml(c) {
+  const a = c.info;
+  const now = Date.now();
+  const rows = [];
+  const row = (label, value) => rows.push(`<dt>${label}</dt><dd>${value}</dd>`);
+  if (a.dir) row('Dossier', `<code>${esc(a.dir)}</code>`);
+  if (a.kind === 'sub') row('Lancé par', esc(a.parentLabel));
+  let state = STATE_LABELS[a.state] ?? esc(a.state);
+  if (c.plan === SLEEP) state += ' (dort)';
+  else if (c.onBreak) state += ' (pause café)';
+  row('État', state);
+  const doing = [ACTIVITY_LABELS[a.activity], a.tool && `<code>${esc(a.tool)}</code>`].filter(Boolean).join(' · ');
+  if (a.state !== 'idle' && doing) row('En cours', doing);
+  if (c.stateSince) row('Depuis', duration(now - c.stateSince));
+  if (a.startedAt) row(a.kind === 'sub' ? 'Lancé il y a' : 'Session ouverte', duration(now - a.startedAt));
+  if (a.subagents?.length) row('Subagents', a.subagents.map((sub) => esc(sub.type)).join(', '));
+  if (a.lastError) row('Dernière erreur', `${a.lastError.tool ? `<code>${esc(a.lastError.tool)}</code> · ` : ''}il y a ${duration(now - a.lastError.at)}`);
+  return `
+    <header><strong>${esc(a.label)}</strong>${a.kind === 'sub' ? ' <small>subagent</small>' : ''}
+      <button type="button" class="close" aria-label="Fermer">×</button></header>
+    <dl>${rows.join('')}</dl>`;
+}
+
 // Flattens a server snapshot into one entry per agent, main agents first.
 function agentsOf(snapshot) {
   const agents = [];
   snapshot.sessions.forEach((s, zone) => {
-    agents.push({ key: s.id, kind: 'main', label: s.name || s.id.slice(0, 8), state: s.state, activity: s.activity, errorAt: s.errorAt, zone });
+    const label = s.name || s.id.slice(0, 8);
+    agents.push({ ...s, key: s.id, kind: 'main', label, zone });
     for (const sub of s.subagents) {
-      agents.push({ key: `${s.id}/${sub.id}`, parent: s.id, kind: 'sub', label: sub.type, state: sub.state, activity: sub.activity, errorAt: sub.errorAt, zone });
+      agents.push({ ...sub, key: `${s.id}/${sub.id}`, parent: s.id, parentLabel: label, kind: 'sub', label: sub.type, zone });
     }
   });
   return agents;
@@ -786,11 +854,12 @@ function agentsOf(snapshot) {
 // `demo` is set.
 export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = {}) {
   root.innerHTML = `
-    <div class="stage"><canvas></canvas></div>
+    <div class="stage"><canvas></canvas><div class="agent-card" role="dialog" hidden></div></div>
     <div class="live-bar"><span class="status" data-state="off">hors ligne</span></div>`;
   const stage = root.querySelector('.stage');
   const canvas = root.querySelector('canvas');
   const status = root.querySelector('.status');
+  const card = root.querySelector('.agent-card');
 
   const critters = new Map();
   let duos = [];
@@ -810,6 +879,9 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
   // the real one) and a salt that redraws the decor.
   let view = { hour: forcedHour, weather: 'auto', season: 'auto', salt: '' };
   let season = null; // the decor's, which the costumes follow
+  const cat = new Cat();
+  let shown = null; // the Clawd whose card is open
+  let cardAt = 0; // when the card's text was last refreshed
 
   function resize() {
     width = stage.clientWidth;
@@ -842,6 +914,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       critter.scale = scaleFor(critter.kind, px);
       critter.relocate();
     }
+    cat.place(office, px, performance.now());
   }
 
   // Whoever just finished working looks for an idle Clawd close by.
@@ -905,6 +978,8 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
         critters.set(agent.key, critter);
       }
       critter.label = agent.label;
+      critter.info = agent;
+      critter.parent = agent.parent ? critters.get(agent.parent) ?? null : null;
       critter.zone = zone;
       critter.costume = costumeFor(agent.key, season);
       critter.update(now, dt, agent, zone);
@@ -929,6 +1004,8 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     }
 
     const date = sceneDate(view.hour);
+    cat.update(now, dt, [...critters.values()], daylight(date).night > 0.5);
+
     ctx.drawImage(office.background, 0, 0, width, height);
     office.overlay(ctx, date, view.weather === 'auto' ? currentWeather() : view.weather);
 
@@ -937,6 +1014,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       ...office.props.map((p) => ({ y: p.base, draw: () => p.draw(ctx) })),
       ...[...critters.values()].map((c) => ({ y: c.y, draw: () => c.draw(ctx, now) })),
       ...duos.map((d) => ({ y: d.y, draw: () => d.draw(ctx, now) })),
+      { y: cat.key, draw: () => cat.draw(ctx, now) },
     ].sort((a, b) => a.y - b.y);
     for (const item of scene) item.draw();
     // Night falls on furniture and Clawds alike; the names stay readable.
@@ -952,6 +1030,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       for (const light of lit) drawLight(ctx, light, night);
     }
     for (const duo of duos) duo.drawOver(ctx, now);
+    cat.drawOver(ctx, now, dark);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
@@ -971,8 +1050,61 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       ctx.fillText('Aucune session Claude Code active', width / 2, viewHeight / 2);
     }
 
+    updateCard(now);
     raf = requestAnimationFrame(tick);
   }
+
+  // The Clawd under the pointer, if any: its body or its name.
+  function critterAt(x, y) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const c of critters.values()) {
+      if (c.leaving) continue;
+      const inside = Math.abs(x - c.x) <= (HALF_BODY + 2) * c.scale && y >= c.y - (HEAD + 4) * c.scale && y <= c.y + 16 + c.scale;
+      const dist = Math.hypot(x - c.x, y - (c.y - (HEAD / 2) * c.scale));
+      if (inside && dist < bestDist) {
+        best = c;
+        bestDist = dist;
+      }
+    }
+    return best;
+  }
+
+  function openCard(critter) {
+    shown = critter;
+    card.hidden = !critter;
+    cardAt = 0;
+  }
+
+  // Follows its Clawd; the text is refreshed twice a second.
+  function updateCard(now) {
+    if (!shown) return;
+    if (shown.dead || shown.leaving || ![...critters.values()].includes(shown)) return openCard(null);
+    if (now - cardAt > 500) {
+      cardAt = now;
+      card.innerHTML = cardHtml(shown);
+    }
+    const w = card.offsetWidth;
+    const h = card.offsetHeight;
+    let top = shown.y - (HEAD + 8) * shown.scale - h;
+    if (top < stage.scrollTop + 4) top = shown.y + 18 + shown.scale;
+    card.style.left = `${Math.round(clamp(shown.x - w / 2, 4, width - w - 4))}px`;
+    card.style.top = `${Math.round(top)}px`;
+  }
+
+  canvas.addEventListener('click', (e) => {
+    if (cat.hit(e.offsetX, e.offsetY)) return cat.pet(performance.now());
+    openCard(critterAt(e.offsetX, e.offsetY));
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    canvas.style.cursor = critterAt(e.offsetX, e.offsetY) || cat.hit(e.offsetX, e.offsetY) ? 'pointer' : '';
+  });
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.close')) openCard(null);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !root.hidden) openCard(null);
+  });
 
   new ResizeObserver(() => {
     if (!root.hidden) resize();
@@ -988,6 +1120,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     },
     hide() {
       root.hidden = true;
+      openCard(null);
       cancelAnimationFrame(raf);
       raf = 0;
     },

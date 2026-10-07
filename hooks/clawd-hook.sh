@@ -14,6 +14,10 @@ if [ "${CLAWD_LOG:-0}" = 1 ]; then
   printf '{"ts":%s,"payload":%s}\n' "$(date +%s)" "$payload" >> "$log"
 fi
 
-printf '%s' "$payload" | curl -s -m 1 -o /dev/null -X POST -H 'Content-Type: application/json' \
-  --data-binary @- "http://127.0.0.1:${CLAWD_PORT:-4777}/event" >/dev/null 2>&1
+# In the background with every stream closed: Claude Code does not wait for
+# the server, which may be slow or down.
+{
+  printf '%s' "$payload" | curl -s -m 1 -o /dev/null -X POST -H 'Content-Type: application/json' \
+    --data-binary @- "http://127.0.0.1:${CLAWD_PORT:-4777}/event"
+} </dev/null >/dev/null 2>&1 &
 exit 0

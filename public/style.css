@@ -340,3 +340,71 @@ body {
   font-family: ui-monospace, monospace;
   font-size: 12px;
 }
+
+.stage {
+  position: relative;
+}
+
+.agent-card {
+  position: absolute;
+  z-index: 5;
+  width: max-content;
+  max-width: min(320px, calc(100% - 8px));
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.agent-card[hidden] {
+  display: none;
+}
+
+.agent-card header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.agent-card header small {
+  color: var(--muted);
+}
+
+.agent-card .close {
+  margin-left: auto;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-card dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0;
+}
+
+.agent-card dt {
+  color: var(--muted);
+}
+
+.agent-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.agent-card code {
+  font-size: 12px;
+}
+
+.setting[hidden] {
+  display: none;
+}

@@ -20,6 +20,9 @@ const WEB_TOOLS = new Set(['WebFetch', 'WebSearch']);
 const THINK_TOOLS = new Set(['Agent', 'Task', 'TodoWrite', 'EnterPlanMode']);
 const WAIT_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
 const WAIT_NOTIFICATIONS = new Set(['permission_prompt', 'elicitation_dialog']);
+// Bash commands worth a reaction: a commit, a test run (green or red).
+const COMMIT = /\bgit(?:\s+-[cC]\s+\S+|\s+--?[\w-]+(?:=\S+)?)*\s+commit\b/;
+const TESTS = /\b(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test|jest|vitest|pytest|mocha|playwright\s+test|go\s+test|cargo\s+test|phpunit|rspec|mvn\s+(?:\S+\s+)*test|gradlew?\s+test|node\s+--test|ng\s+test)\b/;
 const SESSION_TTL = 6 * 3600_000;
 const SUBAGENT_TTL = 30 * 60_000;
 
@@ -33,8 +36,19 @@ function activityFor(tool = '') {
   return 'type';
 }
 
+// `since` only moves when the state changes: how long it has worked or waited.
 function set(agent, state, activity = null, tool = null) {
-  Object.assign(agent, { state, activity, tool, seenAt: Date.now() });
+  const now = Date.now();
+  if (agent.state !== state) agent.since = now;
+  Object.assign(agent, { state, activity, tool, seenAt: now });
+}
+
+// What a finished Bash command means for the Clawd: null when nothing special.
+function reactionTo(p, failed) {
+  const command = p.tool_name === 'Bash' ? String(p.tool_input?.command ?? '') : '';
+  if (TESTS.test(command)) return failed ? 'tests-red' : 'tests-green';
+  if (!failed && COMMIT.test(command)) return 'commit';
+  return null;
 }
 
 // The directory Claude was launched in: the first cwd recorded in the session
@@ -61,12 +75,14 @@ function sessionFor(p) {
   let s = sessions.get(p.session_id);
   if (!s) {
     // Named after the current cwd until the transcript gives the launch directory.
-    s = { id: p.session_id, name: basename(p.cwd ?? ''), state: 'idle', activity: null, tool: null, subagents: new Map() };
+    const now = Date.now();
+    s = { id: p.session_id, name: basename(p.cwd ?? ''), dir: p.cwd ?? null, state: 'idle', since: now, activity: null, tool: null, startedAt: now, subagents: new Map() };
     sessions.set(s.id, s);
     if (p.transcript_path) {
       launchDir(p.transcript_path).then((dir) => {
-        if (dir && sessions.get(s.id) === s && basename(dir) !== s.name) {
+        if (dir && sessions.get(s.id) === s && dir !== s.dir) {
           s.name = basename(dir);
+          s.dir = dir;
           broadcast();
         }
       });
@@ -108,12 +124,16 @@ function apply(p) {
       else set(agent, 'working', activityFor(p.tool_name), p.tool_name);
       break;
     case 'PostToolUseFailure':
-      // A failed tool (not a cancellation): the PWA plays a one-off « oops ».
-      if (!p.is_interrupt) agent.errorAt = Date.now();
-    // falls through
-    case 'PostToolUse':
+    case 'PostToolUse': {
+      const failed = event === 'PostToolUseFailure';
+      // Not a cancellation: red tests get their own face, any other failure a one-off « oops ».
+      const reaction = failed && p.is_interrupt ? null : reactionTo(p, failed);
+      if (reaction) agent.reaction = { kind: reaction, at: Date.now() };
+      else if (failed && !p.is_interrupt) agent.errorAt = Date.now();
+      if (failed && !p.is_interrupt) agent.lastError = { tool: p.tool_name ?? null, at: Date.now() };
       if (agent.state === 'waiting') set(agent, 'working', activityFor(p.tool_name), p.tool_name);
       break;
+    }
     case 'PreCompact':
       // Tidies its notes while the conversation is compacted, then goes back to what it was doing.
       s.beforeCompact = { state: s.state, activity: s.activity, tool: s.tool };
@@ -130,7 +150,7 @@ function apply(p) {
       if (WAIT_NOTIFICATIONS.has(p.notification_type)) set(s, 'waiting', 'bubble');
       break;
     case 'SubagentStart':
-      s.subagents.set(p.agent_id, { id: p.agent_id, type: p.agent_type ?? 'agent' });
+      s.subagents.set(p.agent_id, { id: p.agent_id, type: p.agent_type ?? 'agent', startedAt: Date.now() });
       set(s.subagents.get(p.agent_id), 'working', 'think');
       break;
     case 'SubagentStop':

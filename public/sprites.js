@@ -205,6 +205,12 @@ function mug(p, x, y, t = null) {
 
 // A red cross in a speech bubble: something went wrong.
 const OOPS = ['.KKKKK.', 'KWWWWWK', 'KWRWRWK', 'KWWRWWK', 'KWRWRWK', 'KWWWWWK', '.KKKKK.'];
+// A green tick in a speech bubble: the tests pass.
+const TICK = ['.KKKKK.', 'KWWWWWK', 'KWWWWPK', 'KWWWPWK', 'KPWPWWK', 'KWPWWWK', '.KKKKK.'];
+// A rain cloud, its drops drawn apart: the tests fail.
+const CLOUD = ['..LLL...', '.LLLLLL.', 'LLLLLLLL', '.GGGGGG.'];
+// A parcel sealed with tape: the work is committed.
+const PARCEL = ['HHHYHHH', 'HHHYHHH', 'YYYYYYY', 'HHHYHHH', 'HHHYHHH'];
 // Desk shredder standing on the floor, its slot on the top row.
 const SHREDDER = ['KKKKKKK', 'KGKKKGK', 'KGGGGGK', 'KGGRGGK', 'KGGGGGK', 'KKKKKKK'];
 const STACK = ['WWWW', 'LLLL', 'WWWW', 'LLLL'];
@@ -711,6 +717,66 @@ export const ANIMS = {
       if (i >= 8) for (const [x, y] of [[8, -2], [9, -3], [10, -4]].slice(0, i - 6)) p(x, y, 'G');
     }),
   },
+  // git commit: the work goes into a parcel, sealed and held up high.
+  commit: {
+    label: 'Commit',
+    fps: 7,
+    loop: false,
+    frames: frames(11, (f, i) => {
+      const up = i >= 4 && i <= 8;
+      const hop = i === 5 || i === 6;
+      const p = clawd(f, {
+        dy: hop ? -2 : 0,
+        eyes: i < 3 ? 'down' : up ? 'happy' : 'open',
+        left: up ? 'high' : i < 3 ? 'press' : 'mid',
+        right: up ? 'high' : i < 3 ? 'press' : 'mid',
+        legs: hop ? 'tuck' : 'stand',
+      });
+      // Packed in front of it, then lifted over its head.
+      if (i < 4) stamp(p, 6, 4 - (i === 3 ? 3 : 0), i === 0 ? PARCEL.map((r) => r.replaceAll('Y', 'H')) : PARCEL);
+      else if (i <= 8) stamp(p, 6, -7 + (hop ? 0 : 1), PARCEL);
+      if (i >= 5 && i <= 8) for (const [x, y] of [[3, -8], [15, -9], [2, -4], [16, -5]].slice(0, i - 4)) p(x, y, 'Y');
+    }),
+  },
+  // Tests green: a tick pops up and it bounces.
+  'tests-green': {
+    label: 'Tests verts',
+    fps: 7,
+    loop: false,
+    frames: frames(9, (f, i) => {
+      const hop = i === 2 || i === 3 || i === 6;
+      const p = clawd(f, {
+        dy: hop ? -2 : 0,
+        eyes: i === 0 ? 'wide' : 'happy',
+        left: hop ? 'high' : 'out',
+        right: hop ? 'high' : i >= 4 ? 'mid' : 'out',
+        legs: hop ? 'tuck' : 'stand',
+      });
+      if (i >= 1) stamp(p, 13, -10 + (hop ? 2 : 0), TICK);
+    }),
+  },
+  // Tests red: slumped, eyes down, under its own little rain cloud.
+  'tests-red': {
+    label: 'Tests rouges',
+    fps: 4,
+    loop: false,
+    frames: frames(12, (f, i) => {
+      const p = clawd(f, {
+        dy: i >= 1 ? 1 : 0,
+        eyes: i === 0 ? 'wide' : i % 5 === 4 ? 'closed' : 'down',
+        left: i === 0 ? 'mid' : 'low',
+        right: i === 0 ? 'mid' : 'low',
+        legs: i >= 1 ? 'tuck' : 'stand',
+      });
+      if (i < 1) return;
+      stamp(p, 5, -9, CLOUD);
+      // Drops falling in two staggered columns.
+      for (const [x, k] of [[7, 0], [10, 1], [12, 0]]) {
+        const y = -5 + ((i + k * 2) % 4) * 1;
+        p(x, y, 'B');
+      }
+    }),
+  },
   // Long hours at the desk: a yawn and a stretch, arms up on tiptoe.
   stretch: {
     label: 'Bâille et s\'étire',
@@ -903,6 +969,9 @@ export const GROUPS = [
       ['high-five', 'Stop après un travail, avec un Clawd au repos à côté'],
       ['handoff', 'SubagentStop : le subagent rejoint son agent principal'],
       ['oops', 'PostToolUseFailure : un outil a échoué (pas une annulation)'],
+      ['commit', 'Bash : git commit réussi'],
+      ['tests-green', 'Bash : commande de tests réussie (npm test, vitest, pytest…)'],
+      ['tests-red', 'Bash : commande de tests en échec'],
       ['stretch', 'Au bureau après 10 min de travail d\'affilée, de temps en temps'],
       ['leave', 'SubagentStop, SessionEnd'],
     ],

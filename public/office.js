@@ -1176,6 +1176,9 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
     props.push({ base: Math.round(top) + s.h * p, draw: (ctx) => drawSprite(ctx, s, left, top, p) });
   };
   const standing = (s, left, base) => prop(s, left, base - s.h * p);
+  // The top of a bookcase, where the cat sleeps: drawn just in front of it.
+  const perches = [];
+  const perch = (s, left, base) => perches.push({ x: left + (s.w * p) / 2, y: base - s.h * p, base: Math.round(base) + 1 });
   // A free patch of floor w x h, reserved; null when nothing fits.
   const freeSpot = (w, h, yMin, yMax, tries = 30) => {
     while (tries-- > 0) {
@@ -1207,7 +1210,9 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   while (shelfCount > 1 && wallNeeds(shelfCount) > x1 - u(58) - COUNTER.w * p) shelfCount--;
   const firstShelf = cursor;
   for (let i = 0; i < shelfCount; i++) {
-    standing(look.shelf(), cursor, backBase);
+    const shelf = look.shelf();
+    standing(shelf, cursor, backBase);
+    perch(shelf, cursor, backBase);
     slot('shelf', cursor + u(40), inFront);
     cursor += SHELF.w * p + u(int(6, 16));
   }
@@ -1397,7 +1402,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   for (let i = int(2, 5) * sections; i > 0; i--) scatter(look.plant(), wall + u(80), floorBottom - u(4));
   if (chance(0.5)) scatter(CABINET, wall + floor * 0.5, floorBottom - u(4));
 
-  return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations };
+  return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations, perches, door: { x: doorLeft + doorWidth(p) / 2, y: wall + u(24) } };
 }
 
 
@@ -1435,6 +1440,9 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
     props.push({ base: Math.round(sortAt ?? top + s.h * p), draw: (ctx) => drawSprite(ctx, s, left, top, p) });
   };
   const standing = (s, left, base) => prop(s, left, base - s.h * p);
+  // The top of a bookcase, where the cat sleeps: drawn just in front of it.
+  const perches = [];
+  const perch = (s, left, base) => perches.push({ x: left + (s.w * p) / 2, y: base - s.h * p, base: Math.round(base) + 1 });
   const centered = (s, cx, base) => standing(s, cx - (s.w * p) / 2, base);
   // One model per corner, so pairs of seats match.
   const sofa = look.sofa();
@@ -1484,7 +1492,9 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   standing(LAMP, library.lamp.left, backBase);
   for (let i = 0; i < shelves; i++) {
     const left = shelfStart + i * (SHELF.w * p + u(4));
-    standing(look.shelf(), left, backBase);
+    const shelf = look.shelf();
+    standing(shelf, left, backBase);
+    perch(shelf, left, backBase);
     slot('shelf', left + u(40), inFront, 0, { light: library });
   }
 
@@ -1769,7 +1779,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   const fronts = clamp(Math.floor(cw / u(110)), 3, 12);
   for (let i = 0; i < fronts; i++) slot('front', cx0 + (cw * (i + 0.5)) / fronts, floorBottom - u(2));
 
-  return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations };
+  return { x0: x0 + u(8), x1: x1 - u(8), y0: wall + u(24), y1: floorBottom, stations, perches, door: sharedDoor === null ? null : { x: sharedDoor + doorWidth(p) / 2, y: wall + u(24) } };
 }
 
 // ---- Rooms joined into one floor plan

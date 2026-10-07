@@ -6,7 +6,7 @@ import { buildOffice } from './office.js';
 
 export const LAYOUTS = { rooms: 'Salles', shared: 'Open space partagé' };
 export const PIXEL_SIZES = [1, 2, 3, 4, 5, 6];
-export const DEFAULT_SETTINGS = { decor: 'open-space', layout: 'rooms', px: 4 };
+export const DEFAULT_SETTINGS = { decor: 'open-space', layout: 'rooms', px: 4, notify: 'off' };
 
 // No furniture: an empty floor split in columns, no stations, Clawds wander anywhere.
 function buildBare(width, height, names, { px }) {
