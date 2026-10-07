@@ -1171,6 +1171,8 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   }
   const widest = bare.reduce((a, b) => (b.w > a.w ? b : a));
   if (withClock && widest.w >= u(56)) clocks.push({ x: widest.x, y: top + Math.round(wallH * between(0.4, 0.55)) });
+  // No bare wall wide enough: higher up, over the first bookshelf.
+  else if (withClock) clocks.push({ x: firstShelf + (SHELF.w * p) / 2, y: top + Math.round(wallH * 0.28) });
   // Now and then a small picture in another stretch of bare wall.
   const spare = bare.filter((b) => b !== widest && b.w >= u(60));
   if (spare.length && chance(0.3)) {
@@ -1178,8 +1180,6 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
     const at = pickOne(spare);
     drawSprite(g, frame, Math.round(at.x - (frame.w * p) / 2), Math.round(top + wallH * 0.38), p);
   }
-  // No bare wall wide enough: higher up, over the first bookshelf.
-  else if (withClock) clocks.push({ x: firstShelf + (SHELF.w * p) / 2, y: top + Math.round(wallH * 0.28) });
 
   // Vertical plan: desk rows, then a middle band (meeting table, radio), then the
   // play area at the bottom. Rows are added while they fit; spare height is shared.
@@ -1659,29 +1659,54 @@ const ROOM_DOOR = (u) => u(24); // from the room's left wall to its door
 const WALL_TOP = '#7d6a56'; // the walls seen from above
 const WALL_EDGE = '#4f4338';
 const THRESHOLD = '#c9b48f';
+const GLASS = '#d4e8f2';
+const GLASS_FRAME = '#8d9aa1';
 const HALL_THEME = { wall: '#ece6d8', wallLow: '#e2dac8', wallStyle: 'plain', base: '#d3cab6', floor: '#efe8da', line: '#e2d9c7', floorStyle: 'tiles' };
 
 // A hallway under a short room: a low wall hung with a few pictures, tiles and
 // a plant or two.
-function paintHall(g, { x0, x1, top, bottom, door }, seed, { p, u }) {
+function paintHall(g, { x0, x1, top, bottom, door, glass }, seed, { p, u }) {
   const random = seeded(seed);
   const look = dressing(THEMES[0], random);
   const wallH = Math.min(u(60), Math.round((bottom - top) * 0.4));
   paintArea(g, x0, top, x1 - x0, bottom - top, wallH, u, HALL_THEME);
-  // The doorway from the room above cuts through the low wall.
-  g.fillStyle = HALL_THEME.floor;
-  g.fillRect(door.x, top, door.w, wallH);
-  g.fillStyle = WALL_EDGE;
-  g.fillRect(door.x - p, top, p, wallH);
-  g.fillRect(door.x + door.w, top, p, wallH);
-  // Pictures along the wall, clear of the doorway and of the plants at the ends.
+  if (glass) {
+    // A glass partition: panes between thin mullions, and a glass door.
+    g.fillStyle = GLASS;
+    g.fillRect(x0, top, x1 - x0, wallH);
+    g.fillStyle = GLASS_FRAME;
+    g.fillRect(x0, top + wallH - u(6), x1 - x0, u(6));
+    for (let x = x0 + u(48); x < x1 - u(10); x += u(48)) g.fillRect(x, top, p, wallH - u(6));
+    g.fillStyle = 'rgb(255 255 255 / 0.6)'; // reflections
+    for (let x = x0 + u(14); x < x1 - u(30); x += u(96)) {
+      g.fillRect(x, top + u(8), p, u(14));
+      g.fillRect(x + 2 * p, top + u(4), p, u(10));
+    }
+    g.fillStyle = GLASS_FRAME;
+    g.fillRect(door.x - p, top, door.w + 2 * p, wallH);
+    g.fillStyle = '#c3dcea';
+    g.fillRect(door.x + p, top + p, door.w - 2 * p, wallH - u(6) - p);
+    g.fillStyle = WALL_EDGE;
+    g.fillRect(door.x + door.w - 4 * p, top + Math.round(wallH * 0.45), 2 * p, p); // handle
+  } else {
+    // The doorway from the room above cuts through the low wall.
+    g.fillStyle = HALL_THEME.floor;
+    g.fillRect(door.x, top, door.w, wallH);
+    g.fillStyle = WALL_EDGE;
+    g.fillRect(door.x - p, top, p, wallH);
+    g.fillRect(door.x + door.w, top, p, wallH);
+  }
+  // A picture or two along the wall, clear of the doorway and of the plants at the ends.
   const spots = [];
-  for (let x = x0 + u(90); x < x1 - u(110); x += u(70)) {
+  for (let x = x0 + u(90); x < x1 - u(110) && !glass; x += u(70)) {
     if (x + u(50) > door.x - u(20) && x < door.x + door.w + u(20)) continue;
     spots.push(x);
   }
+  let hung = 0;
+  const most = random() < 0.5 ? 1 : 2;
   for (const x of spots) {
-    if (random() < 0.45) continue;
+    if (hung >= most || random() < 0.6) continue;
+    hung++;
     const frame = FRAMES[Math.floor(random() * FRAMES.length)];
     const fh = frame.h * p;
     if (fh > wallH - u(8)) continue;
@@ -1774,9 +1799,11 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
         if (hallFor(k)) {
           // Where the hallway opens onto the room above, chosen now so its
           // pictures keep clear of it.
-          const w = u(80);
+          // Sometimes a glass partition with a glass door instead of a wall.
+          const glass = vary(i, 'glass', 0) < 0.35;
+          const w = glass ? u(56) : Math.round(u(60) + u(90) * vary(i, 'hall-door-w', 0));
           const door = { x: Math.round(x0 + u(140) + vary(i, 'hall-door', 0) * (widths[i] - u(220) - w)), w };
-          cells.push({ x0, x1: room.x1, top: bottom + wallT, bottom: rowTop + rowH, r, c: k, hall: true, i, door });
+          cells.push({ x0, x1: room.x1, top: bottom + wallT, bottom: rowTop + rowH, r, c: k, hall: true, i, door, glass });
         }
         rooms.push(room);
         x0 = room.x1 + wallT;
@@ -1832,11 +1859,16 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
         // Side doorways stay clear of the back walls, where the furniture stands.
         const low = Math.max(cell.hall ? cell.top + u(30) : cell.top + u(170), next.hall ? next.top + u(30) : next.top + u(170));
         const high = Math.min(cell.bottom, next.bottom) - u(30);
-        const h = Math.min(u(90), high - low);
+        const h = Math.min(Math.round(u(50) + u(110) * random()), high - low);
         if (h >= u(50)) opening(cell.x1, low + random() * (high - low - h), next.x0 - cell.x1, h, false);
       }
-      // A hallway opens onto the room above it.
-      if (cell.hall) opening(cell.door.x, cell.top - wallT, cell.door.w, wallT, true);
+      // A hallway opens onto the room above it, or shows it through glass.
+      if (cell.hall && cell.glass) {
+        g.fillStyle = GLASS_FRAME;
+        g.fillRect(cell.x0, cell.top - wallT, cell.x1 - cell.x0, wallT);
+        g.fillStyle = GLASS;
+        g.fillRect(cell.x0, cell.top - wallT + px, cell.x1 - cell.x0, wallT - 2 * px);
+      } else if (cell.hall) opening(cell.door.x, cell.top - wallT, cell.door.w, wallT, true);
     }
     // The way in: a gap in the bottom wall of the first room of the last row,
     // a mat and a path out to the street.
