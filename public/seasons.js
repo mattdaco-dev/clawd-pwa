@@ -477,6 +477,8 @@ export function seasonFloor(env, place, g, area) {
     put(BOOT);
     put(BREAD_MAN);
   }
+  yearFloor(env, put, g, area);
+  yearCritters(env, area, place);
 
   function put(s) {
     const at = place(s);
@@ -717,4 +719,228 @@ export function skyEvent(season) {
   if (season === 'nouvel-an' || FLAGS[season]) return fireworks;
   if (season === 'buergbrennen') return bonfire;
   return null;
+}
+
+// ---- On the tables: the feast's speciality, or the season's.
+const FOOD = {
+  // Champagne and flutes.
+  'nouvel-an': sprite([
+    '...g.......',
+    '...Y.......',
+    '..ggg......',
+    '..ggg.W..W.',
+    '..gYg.Y..Y.',
+    '..ggg.Y..Y.',
+    '..ggg..W..W',
+    '..ggg.WWW.W',
+  ]),
+  // Rieslingspaschtéit, the Riesling pie.
+  'fete-lu': sprite([
+    '.OOOOOOOOO.',
+    'ODODODODODO',
+    'OOOOOOOOOOO',
+    'OMOMOMOMOMO',
+    '.WWWWWWWWW.',
+  ]),
+  // A baguette and a wedge of cheese.
+  'fete-fr': sprite([
+    '........YY.',
+    'OOOOOOOYYYY',
+    'ODODODOYYYY',
+    'OOOOOOO....',
+  ]),
+  // Fries in a cone, and a waffle.
+  'fete-be': sprite([
+    'Y.Y.Y......',
+    'YYYYY......',
+    'RRRRR.OOOO.',
+    '.RRR..ODOD.',
+    '.RRR..OOOO.',
+    '..R...ODOD.',
+  ]),
+  // A pretzel and a beer.
+  'fete-de': sprite([
+    '.HH.HH.WWW.',
+    'H..H..HWWWA',
+    'H.HHH.HYYYA',
+    '.HH.HH.YYYA',
+    '.......YYY.',
+  ]),
+  // Gromperekichelcher, potato fritters, on a paper plate.
+  fouer: sprite([
+    '.HO.OH.OH.',
+    'HOOHOOHOOH',
+    'WWWWWWWWWW',
+    '.WWWWWWWW.',
+  ]),
+  // Verwurelter: knotted fritters dusted with sugar.
+  fuesend: sprite([
+    '.OWO..OWO.',
+    'OWOWOOWOWO',
+    '.OWO..OWO.',
+    'WWWWWWWWWW',
+  ]),
+  // Glühwäin, two steaming mugs.
+  buergbrennen: sprite([
+    '.W....W...',
+    'W....W....',
+    'RRRK.RRRK.',
+    'RRRK.RRRKK',
+    'RRRK.RRRK.',
+  ]),
+  // Boxemännchen and mandarins.
+  kleeschen: sprite([
+    '..OO......',
+    '.OKOK.....',
+    'OOOOOO....',
+    '.OYOO..oo.',
+    '.OOOO.oooo',
+    '.O..O.oooo',
+  ]),
+  // A yule log under sugar snow, with holly.
+  noel: sprite([
+    '...RP.....',
+    '.WWWWWWWW.',
+    'DHDHDHDHDH',
+    'HDHDHDHDHD',
+    'DHDHDHDHDH',
+    '.WWWWWWWW.',
+  ]),
+  // An Easter lamb cake and two eggs.
+  paques: sprite([
+    '.WWW.......',
+    'WKWWWWW....',
+    '.WWWWWWW.qq',
+    '..WWWWW.yyy',
+    '.WWWWWWW.b.',
+  ]),
+  // A bowl of sweets.
+  halloween: sprite([
+    '.R.Y.v.o.',
+    'oRYvoRYvo',
+    'vvvvvvvvv',
+    '.vvvvvvv.',
+  ]),
+  printemps: sprite([
+    '.P..P..P.',
+    'RRR.RRRRR',
+    'RRRRRRRR.',
+    'WWWWWWWWW',
+    '.WWWWWWW.',
+  ]),
+  // A slice of watermelon and an ice cream.
+  ete: sprite([
+    '.......qq.',
+    '......qqyy',
+    'RKRKR..yy.',
+    'RRRRR..HH.',
+    'WWWWW..HH.',
+    'PPPPP...H.',
+  ]),
+  // Quetschentaart, the plum tart.
+  automne: sprite([
+    '.vOvOvOvO.',
+    'vOvOvOvOvO',
+    'OOOOOOOOOO',
+    '.WWWWWWWW.',
+  ]),
+  // Hot chocolate with cream.
+  hiver: sprite([
+    '.W....W...',
+    'WWWK.WWWK.',
+    'HHHK.HHHKK',
+    'HHHK.HHHK.',
+  ]),
+};
+
+export function seasonTables(env) {
+  const food = FOOD[env.season];
+  if (!food) return;
+  const { p, props } = env;
+  const TABLE_W = 24;
+  for (const { left, top } of env.tables) {
+    const x = left + ((TABLE_W - food.w) / 2) * p;
+    const y = top + 2 * p - food.h * p;
+    props.push({ base: Math.round(top + 8 * p) + 1, draw: (ctx) => drawSprite(ctx, food, x, y, p) });
+  }
+}
+
+// ---- Seasons of the year, between feasts.
+const ICE_BUCKET = sprite([
+  '...g.g..',
+  '...g.g..',
+  '.AAgAgA.',
+  'AWAgAgWA',
+  'AAAAAAAA',
+  '.AAAAAA.',
+]);
+const TULIPS = sprite([
+  'R..q..Y',
+  'RR.qqYY',
+  '.P.P.P.',
+  '..PPP..',
+  '..HHH..',
+  '..HHH..',
+]);
+const FAN = [
+  sprite(['..K..', '.KAK.', 'AAKAA', '.KAK.', '..K..', '..K..', '..K..', '.KKK.']),
+  sprite(['A...A', '.AKA.', '..K..', '.AKA.', 'A...A', '..K..', '..K..', '.KKK.']),
+];
+const BUTTERFLY = (c) => [sprite([`${c}${c}.${c}${c}`, `${c}${c}K${c}${c}`, `.${c}.${c}.`]), sprite(['..K..', `.${c}K${c}.`, '..K..'])];
+const LEAF_COLORS = ['o', 'n', 'R', 'Y', 'H'];
+
+function leaves(g, area, p) {
+  const n = Math.round(((area.x1 - area.x0) * (area.y1 - area.y0)) / (p * p * 1400));
+  for (let i = 0; i < n; i++) {
+    const x = Math.round(area.x0 + Math.random() * (area.x1 - area.x0));
+    const y = Math.round(area.y0 + Math.random() * (area.y1 - area.y0));
+    g.fillStyle = INK[LEAF_COLORS[i % LEAF_COLORS.length]];
+    g.fillRect(x, y, 2 * p, p);
+    g.fillRect(x + p, y - p, p, p);
+  }
+}
+
+// Called with the other floor things: what each season of the year adds.
+export function yearFloor(env, put, g, area) {
+  const { season, p } = env;
+  if (season === 'nouvel-an') put(ICE_BUCKET);
+  else if (season === 'printemps') {
+    put(TULIPS);
+    put(TULIPS);
+  } else if (season === 'automne') leaves(g, area, p);
+}
+
+function butterflies(env, area, n) {
+  const { p, u, props } = env;
+  for (let i = 0; i < n; i++) {
+    const frames = BUTTERFLY(['q', 'y', 'b', 'o', 'W'][Math.floor(Math.random() * 5)]);
+    const w = wanderer(area, { reach: u(200), speed: u(50), rest: [200, 1500] });
+    const seed = Math.random() * 1000;
+    props.push({
+      get base() { return Math.round(w.y); },
+      draw(ctx) {
+        const now = performance.now();
+        w.step(now);
+        const s = frames[Math.floor((now + seed) / 160) % 2];
+        const lift = u(34) + Math.sin((now + seed) / 300) * u(8);
+        drawSprite(ctx, s, w.x - (s.w * p) / 2, w.y - lift, p);
+      },
+    });
+  }
+}
+
+function fan(env, at) {
+  const { p, props } = env;
+  props.push({
+    base: Math.round(at.top + FAN[0].h * p),
+    draw: (ctx) => drawSprite(ctx, FAN[Math.floor(performance.now() / 90) % 2], at.left, at.top, p),
+  });
+}
+
+export function yearCritters(env, area, place) {
+  if (env.season === 'printemps') butterflies(env, area, 2);
+  else if (env.season === 'ete') {
+    const at = place(FAN[0]);
+    if (at) fan(env, at);
+  }
 }

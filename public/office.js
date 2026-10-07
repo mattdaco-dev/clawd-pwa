@@ -6,7 +6,7 @@
 // Distances below are written for 5 px pixels and scaled by u() to the chosen
 // pixel size, so the whole office zooms with the Clawds.
 import { INK, drawSprite, sprite } from './pixels.js';
-import { TREE_GIFTS, seasonCritters, seasonFloor, seasonWall, skyEvent, snowSill, treeTrain, wallSpiders } from './seasons.js';
+import { TREE_GIFTS, seasonCritters, seasonFloor, seasonTables, seasonWall, skyEvent, snowSill, treeTrain, wallSpiders } from './seasons.js';
 import { sunTimes } from './sun.js';
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -239,7 +239,12 @@ export function seasonOf(date) {
   if (m === 9 || (m === 10 && d <= 2)) return 'halloween';
   if (m === 11 && d <= 6) return 'kleeschen';
   if (m === 11 || (m === 0 && d <= 6)) return 'noel';
-  return null;
+  // Between feasts, the season of the year.
+  const md = (m + 1) * 100 + d;
+  if (md >= 320 && md < 621) return 'printemps';
+  if (md >= 621 && md < 923) return 'ete';
+  if (md >= 923 && md < 1221) return 'automne';
+  return 'hiver';
 }
 
 // Pumpkins and trees are props; their lights are also redrawn over the night tint.
@@ -319,7 +324,7 @@ const WINDOW_SILL = 14; // distance from the sill to the foot of the wall, at 5 
 function drawWindow(g, model, left, wall, { p, u, skies, season }) {
   const top = wall - u(WINDOW_SILL) - model.h * p;
   drawSprite(g, model, left, top, p);
-  if (season === 'noel') snowSill(g, left, top, model, p);
+  if (season === 'noel' || season === 'hiver') snowSill(g, left, top, model, p);
   skies.push({ left: Math.round(left), top: Math.round(top), model });
 }
 
@@ -1275,6 +1280,7 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
     const tableTop = middle - TABLE.h * p + u(between(-15, 15));
     const tableBase = tableTop + TABLE.h * p;
     prop(TABLE, tableX - (TABLE.w * p) / 2, tableTop);
+    env.tables.push({ left: tableX - (TABLE.w * p) / 2, top: tableTop });
     slot('board', tableX, tableTop + u(12));
     slot('board', tableX - u(95), tableBase - u(6));
     slot('board', tableX + u(95), tableBase - u(6));
@@ -1426,6 +1432,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   const tableBase = floorTop + u(170);
   paintRug(g, leftMid, tableBase - u(18), u(200), u(85), look.rug(), p);
   centered(TABLE, leftMid, tableBase);
+  env.tables.push({ left: leftMid - (TABLE.w * p) / 2, top: tableBase - TABLE.h * p });
   const boardBase = tableBase + u(110);
   const stand = look.boardStand();
   const thinking = floorLamp(leftMid + (stand.w * p) / 2 + u(14), boardBase, p);
@@ -1508,6 +1515,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
   if (cafeBase <= floorEnd) {
     const cafeX = clamp(loungeX + u(between(-50, 50)), rx0 + u(140), x1 - u(160));
     centered(TABLE, cafeX, cafeBase);
+    env.tables.push({ left: cafeX - (TABLE.w * p) / 2, top: cafeBase - TABLE.h * p });
     for (const side of [-1, 1]) {
       const cx = cafeX + side * u(100);
       seat(cafeChair, cx, cafeBase - cafeChair.h * p + u(4), 'coffee');
@@ -1570,6 +1578,7 @@ function furnishShared(g, { x0, x1, top, bottom }, env) {
     const tableBase = y + u(80);
     paintRug(g, cx, tableBase - u(18), u(200), u(85), look.rug(), p);
     centered(TABLE, cx, tableBase);
+    env.tables.push({ left: cx - (TABLE.w * p) / 2, top: tableBase - TABLE.h * p });
     slot('board', cx, tableBase - TABLE.h * p + u(12));
     slot('board', cx - u(95), tableBase - u(6));
     slot('board', cx + u(95), tableBase - u(6));
@@ -1794,7 +1803,8 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
   const glows = []; // small lights redrawn over the night tint
   const plates = []; // room names, drawn over everything else
   const walls = []; // garlands, redrawn each frame over the window skies
-  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates, salt, walls };
+  const tables = []; // meeting and café tables, for the season's food
+  const env = { p: px, u, props, clocks, skies, lamps, glows, season, plates, salt, walls, tables };
   // Seeds come from the session names; a salt gives the same names another layout.
   const seedOf = (i) => `${salt}${names[i] ?? ''}`;
   const zones = [];
@@ -1947,6 +1957,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     g.fillRect(gateX + u(6), hallway.bottom + wallT + px + u(6), gateW - u(12), u(14));
   }
 
+  seasonTables(env);
   return {
     background,
     height,

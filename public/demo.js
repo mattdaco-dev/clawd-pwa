@@ -127,6 +127,7 @@ const SEASONS = {
   'fete-lu': 'Fête nationale (LU)', 'fete-fr': '14 juillet (FR)', 'fete-be': 'Fête nationale (BE)',
   fouer: 'Schueberfouer', 'fete-de': 'Tag der Deutschen Einheit (DE)', halloween: 'Halloween',
   kleeschen: 'Kleeschen', noel: 'Noël',
+  printemps: 'Printemps', ete: 'Été', automne: 'Automne', hiver: 'Hiver',
 };
 
 const options = (map, current) => Object.entries(map)

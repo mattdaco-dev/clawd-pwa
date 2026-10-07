@@ -72,7 +72,15 @@ sur cinq déguisés), Buergbrennen (premier dimanche de Carême et la veille : f
 fenêtres, bonnets) et Kleeschen (1er au 6 décembre : bottes garnies, Boxemännchen, mitres et
 Houseker). `/?saison=paques` (ou `fouer`, `halloween`, `noel`, `nouvel-an`, `fuesend`,
 `buergbrennen`, `kleeschen`, `fete-lu`, `fete-fr`, `fete-be`, `fete-de`) pour les voir hors
-saison, ou le menu de la Démo. Les cadeaux de Noël s'empilent au pied du sapin et ailleurs.
+saison, ou le menu de la Démo. Les cadeaux de Noël s'empilent au pied du sapin et ailleurs ; au
+Nouvel An, champagne et flûtes sur les tables, seau à glace au sol.
+
+Chaque fête pose sa spécialité sur les tables de réunion : Rieslingspaschtéit, Gromperekichelcher,
+Verwurelter, Glühwäin, Boxemännchen et mandarines, bûche, agneau pascal, bonbons, baguette et
+fromage, frites et gaufre, bretzel et bière. Entre les fêtes, la saison de l'année : printemps
+(tulipes, papillons, fraises), été (ventilateur, pastèque et glace, lunettes de soleil, casquettes),
+automne (feuilles mortes, Quetschentaart, écharpes, bérets), hiver (neige aux rebords, chocolat chaud,
+bonnets, écharpes, cache-oreilles). `?saison=printemps` (ou `ete`, `automne`, `hiver`).
 
 Un outil qui échoue (`PostToolUseFailure`, hors annulation) fait sursauter son Clawd sous une croix
 rouge. Après 10 min de travail d'affilée, un Clawd au clavier bâille et s'étire de temps en temps, et

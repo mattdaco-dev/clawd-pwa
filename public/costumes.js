@@ -178,13 +178,67 @@ const COSTUMES = {
     ]),
   },
   woolly: {
-    season: 'buergbrennen',
+    seasons: ['buergbrennen', 'hiver'],
     hat: hat([
       '...W...',
       '.RRRRR.',
       'RWRWRWR',
       'WWWWWWW',
     ]),
+  },
+  // Seasons of the year: fewer of them, and quieter.
+  sunglasses: {
+    season: 'ete',
+    hat: (a) => {
+      const y = a.eyes - a.top;
+      const cells = [];
+      for (let x = -5; x <= 5; x++) cells.push([x, y - 1, 'K']);
+      for (const side of [-4, 2]) for (let dx = 0; dx < 3; dx++) cells.push([side + dx, y, 'K']);
+      return cells;
+    },
+  },
+  cap: {
+    season: 'ete',
+    hat: hat([
+      '..BBBBB....',
+      '.BBBWBBBBBB',
+    ]),
+  },
+  strawHat: {
+    season: 'ete',
+    hat: hat([
+      '...YYYYY...',
+      '...RRRRR...',
+      'YYYYYYYYYYY',
+    ]),
+  },
+  flowerPin: {
+    season: 'printemps',
+    hat: (a) => [[a.right - a.cx - 2, -1, 'q'], [a.right - a.cx - 3, -2, 'q'], [a.right - a.cx - 1, -2, 'q'], [a.right - a.cx - 2, -3, 'q'], [a.right - a.cx - 2, -2, 'Y']],
+  },
+  // A red scarf round the neck, one end hanging.
+  scarf: {
+    seasons: ['automne', 'hiver'],
+    body: (x, y, a) => (y === a.eyes + 2 && a.torso.has(y) ? '#c8404a' : null),
+    hat: (a) => [[a.right - a.cx - 4, a.eyes - a.top + 3, 'R'], [a.right - a.cx - 4, a.eyes - a.top + 4, 'R'], [a.right - a.cx - 3, a.eyes - a.top + 3, 'R']],
+  },
+  beret: {
+    season: 'automne',
+    hat: hat([
+      '.....D...',
+      '..DDDDDD.',
+      '.DDDDDDDD',
+    ]),
+  },
+  earmuffs: {
+    season: 'hiver',
+    hat: (a) => {
+      const y = a.eyes - a.top - 1;
+      const cells = [];
+      for (let x = a.left - a.cx; x <= a.right - a.cx; x++) cells.push([x, -1, 'K']);
+      for (const x of [a.left - a.cx - 1, a.right - a.cx + 1]) for (let dy = -1; dy <= 1; dy++) cells.push([x, y + dy, 'R']);
+      return cells;
+    },
   },
   // A Christmas jumper: red, with a band of green and white below the eyes.
   jumper: {
@@ -211,7 +265,7 @@ for (const [season, { colors, vertical }] of Object.entries(FLAGS)) {
   };
 }
 // More of them dress up for carnival, everybody waves a flag on a national day.
-const SHARE = { fuesend: 80, 'fete-lu': 50, 'fete-fr': 50, 'fete-be': 50, 'fete-de': 50 };
+const SHARE = { fuesend: 80, 'fete-lu': 50, 'fete-fr': 50, 'fete-be': 50, 'fete-de': 50, printemps: 20, ete: 30, automne: 25, hiver: 35 };
 
 function hash(text) {
   let h = 2166136261;
