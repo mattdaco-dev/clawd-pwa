@@ -916,7 +916,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       critter.scale = scaleFor(critter.kind, px);
       critter.relocate();
     }
-    cat.place(office, px, performance.now(), { season, salt: view.salt });
+    if (!office.bare) cat.place(office, px, performance.now(), { season, salt: view.salt });
   }
 
   // Whoever just finished working looks for an idle Clawd close by.
@@ -983,7 +983,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       critter.info = agent;
       critter.parent = agent.parent ? critters.get(agent.parent) ?? null : null;
       critter.zone = zone;
-      critter.costume = costumeFor(agent.key, season);
+      critter.costume = office.bare ? null : costumeFor(agent.key, season);
       critter.update(now, dt, agent, zone);
     }
 
@@ -1006,7 +1006,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     }
 
     const date = sceneDate(view.hour);
-    cat.update(now, dt, [...critters.values()], daylight(date).night > 0.5);
+    if (!office.bare) cat.update(now, dt, [...critters.values()], daylight(date).night > 0.5);
 
     ctx.drawImage(office.background, 0, 0, width, height);
     office.overlay(ctx, date, view.weather === 'auto' ? currentWeather() : view.weather);
@@ -1016,7 +1016,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       ...office.props.map((p) => ({ y: p.base, draw: () => p.draw(ctx) })),
       ...[...critters.values()].map((c) => ({ y: c.y, draw: () => c.draw(ctx, now) })),
       ...duos.map((d) => ({ y: d.y, draw: () => d.draw(ctx, now) })),
-      { y: cat.key, draw: () => cat.draw(ctx, now) },
+      ...(office.bare ? [] : [{ y: cat.key, draw: () => cat.draw(ctx, now) }]),
     ].sort((a, b) => a.y - b.y);
     for (const item of scene) item.draw();
     // Night falls on furniture and Clawds alike; the names stay readable.
@@ -1033,7 +1033,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       if (level) drawLight(ctx, light, level);
     }
     for (const duo of duos) duo.drawOver(ctx, now);
-    cat.drawOver(ctx, now, dark);
+    if (!office.bare) cat.drawOver(ctx, now, dark);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
@@ -1100,7 +1100,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
 
   canvas.addEventListener('click', (e) => {
     const [x, y] = [e.offsetX, e.offsetY];
-    if (cat.hit(x, y)) return cat.pet(performance.now());
+    if (!office?.bare && cat.hit(x, y)) return cat.pet(performance.now());
     const critter = critterAt(x, y);
     if (critter) return openCard(critter);
     if (office.ghosts?.some((g) => g.scare(x, y, performance.now()))) return;
@@ -1109,7 +1109,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
   });
   canvas.addEventListener('mousemove', (e) => {
     const [x, y] = [e.offsetX, e.offsetY];
-    const any = cat.hit(x, y) || critterAt(x, y, true) || office?.ghosts?.some((g) => g.hit(x, y)) || office?.hitSwitch?.(x, y);
+    const any = (!office?.bare && cat.hit(x, y)) || critterAt(x, y, true) || office?.ghosts?.some((g) => g.hit(x, y)) || office?.hitSwitch?.(x, y);
     canvas.style.cursor = any ? 'pointer' : '';
   });
   card.addEventListener('click', (e) => {

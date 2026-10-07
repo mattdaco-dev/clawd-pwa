@@ -41,7 +41,8 @@ function buildBare(width, height, names, { px, desk = 'off', salt = '' }) {
       zone.stations.desk = [d.station];
     });
   }
-  return { background, height, zones, shared: false, props, overlay() {} };
+  // Bare means bare: no costumes, no cat, nothing beyond the optional desks.
+  return { background, height, zones, shared: false, props, overlay() {}, bare: true };
 }
 
 export const DECORS = {
