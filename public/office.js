@@ -6,7 +6,7 @@
 // Distances below are written for 5 px pixels and scaled by u() to the chosen
 // pixel size, so the whole office zooms with the Clawds.
 import { INK, drawSprite, sprite } from './pixels.js';
-import { TREE_GIFTS, seasonCritters, seasonFloor, seasonTables, seasonWall, skyEvent, snowSill, treeTrain, wallSpiders } from './seasons.js';
+import { TREE_GIFTS, flicker, seasonCritters, seasonFloor, seasonTables, seasonWall, skyEvent, snowSill, treeTrain, wallSpiders } from './seasons.js';
 import { sunTimes } from './sun.js';
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -2213,17 +2213,6 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
       return night;
     },
   };
-}
-
-// How bright a flame is at a given time, about 0.3 to 1.25: a slow sway, a
-// quicker shiver, and a brief duck now and then. `seed` keeps neighbours apart.
-function flicker(now, seed) {
-  const t = now / 1000;
-  const sway = 0.14 * Math.sin(t * 2.3 + seed) + 0.08 * Math.sin(t * 5.7 + seed * 1.7);
-  const shiver = 0.07 * Math.sin(t * 13.1 + seed * 2.9);
-  const step = Math.floor(t * 8);
-  const duck = (Math.sin(step * 12.9898 + seed * 78.233) * 43758.5453) % 1;
-  return 0.95 + sway + shiver - (Math.abs(duck) > 0.92 ? 0.4 : 0);
 }
 
 // How dark it is, from the real sunrise and sunset of the day: night is 0 by

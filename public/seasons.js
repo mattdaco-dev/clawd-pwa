@@ -474,6 +474,11 @@ export function seasonFloor(env, place, g, area) {
       props.push({ base: Math.round(at.top + CAULDRON.h * p), draw: (ctx) => drawSprite(ctx, CAULDRON, at.left, at.top, p) });
       glows.push({ cells: CAULDRON_BREW, left: at.left, top: at.top, p, x: at.left + 5 * p, y: at.top + p, r: 9, box: { x: at.left, y: at.top, w: CAULDRON.w * p, h: CAULDRON.h * p } });
     }
+    const candles = place(CANDLES.halloween);
+    if (candles) {
+      props.push({ base: Math.round(candles.top + CANDLES.halloween.h * p), draw: (ctx) => drawSprite(ctx, CANDLES.halloween, candles.left, candles.top, p) });
+      candleGlow(env, [{ s: CANDLES.halloween, ...candles }], 11);
+    }
   } else if (season === 'noel') {
     for (let i = 0; i < 2; i++) put(POINSETTIA);
     for (let i = 0; i < 2; i++) put(giftStack(Math.random));
@@ -797,6 +802,68 @@ export function skyEvent(season) {
   return null;
 }
 
+// How bright a flame is at a given time, about 0.3 to 1.25: a slow sway, a
+// quicker shiver, and a brief duck now and then. `seed` keeps neighbours apart.
+export function flicker(now, seed) {
+  const t = now / 1000;
+  const sway = 0.14 * Math.sin(t * 2.3 + seed) + 0.08 * Math.sin(t * 5.7 + seed * 1.7);
+  const shiver = 0.07 * Math.sin(t * 13.1 + seed * 2.9);
+  const step = Math.floor(t * 8);
+  const duck = (Math.sin(step * 12.9898 + seed * 78.233) * 43758.5453) % 1;
+  return 0.95 + sway + shiver - (Math.abs(duck) > 0.92 ? 0.4 : 0);
+}
+
+// ---- Candles: wax sprites with an `E` wick, their flames drawn with the night
+// glows so they light up in the evening and switch on and off with a click.
+const CANDLES = {
+  // Purple, orange and cream pillars on a tray, by the cauldron's side.
+  halloween: sprite([
+    '.E.........',
+    'vvv........',
+    'vvv...E....',
+    'vvv..ooo...',
+    'vvv..ooo.E.',
+    'vvv..ooowww',
+    'vvv..ooowww',
+    'GGGGGGGGGGG',
+  ]),
+};
+// One candle on each side of the dish.
+const TABLE_CANDLES = {
+  halloween: sprite(['.E.', '.v.', '.v.', '.v.', 'GGG']),
+  noel: sprite(['.E.', '.R.', '.R.', '.R.', 'gRg']),
+  hiver: sprite(['.E.', '.W.', '.W.', '.W.', 'AAA']),
+};
+
+// A flame on each wick: one to three pixels tall as it flickers, its tip
+// leaning aside when it flares.
+function drawFlames(ctx, wicks, p, now) {
+  for (const w of wicks) {
+    const f = flicker(now, w.seed);
+    const tall = f < 0.7 ? 1 : f > 1.05 ? 3 : 2;
+    const lean = tall === 3 ? Math.sign(Math.sin(now / 170 + w.seed)) * p : 0;
+    for (let k = 0; k < tall; k++) {
+      ctx.fillStyle = INK[tall === 1 ? 'o' : k === tall - 1 ? 'y' : 'Y'];
+      ctx.fillRect(Math.round(w.x + (k === 2 ? lean : 0)), Math.round(w.y - (k + 1) * p), p, p);
+    }
+  }
+}
+
+// Lights the wicks of candle sprites placed at `spots` ({ s, left, top }), as one
+// glow switched together.
+function candleGlow(env, spots, r) {
+  const { p } = env;
+  const wicks = spots.flatMap(({ s, left, top }) => s.cells.filter(([, , c]) => c === 'E')
+    .map(([x, y]) => ({ x: Math.round(left) + x * p, y: Math.round(top) + y * p, seed: left * 0.37 + x * 5.1 + top * 0.11 })));
+  const x0 = Math.min(...spots.map((o) => o.left));
+  const x1 = Math.max(...spots.map((o) => o.left + o.s.w * p));
+  const y0 = Math.min(...wicks.map((w) => w.y)) - 3 * p;
+  const y1 = Math.max(...spots.map((o) => o.top + o.s.h * p));
+  const cx = wicks.reduce((sum, w) => sum + w.x, 0) / wicks.length + p / 2;
+  const cy = Math.min(...wicks.map((w) => w.y)) - p;
+  env.glows.push({ flame: true, x: cx, y: cy, r, draw: (ctx, now) => drawFlames(ctx, wicks, p, now), box: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } });
+}
+
 // ---- On the tables: the feast's speciality, or the season's.
 const FOOD = {
   // Champagne and flutes.
@@ -931,13 +998,22 @@ const FOOD = {
 
 export function seasonTables(env) {
   const food = FOOD[env.season];
-  if (!food) return;
+  const candle = TABLE_CANDLES[env.season];
   const { p, props } = env;
   const TABLE_W = 24;
   for (const { left, top } of env.tables) {
-    const x = left + ((TABLE_W - food.w) / 2) * p;
-    const y = top + 2 * p - food.h * p;
-    props.push({ base: Math.round(top + 8 * p) + 1, draw: (ctx) => drawSprite(ctx, food, x, y, p) });
+    const base = Math.round(top + 8 * p) + 1;
+    if (food) {
+      const x = left + ((TABLE_W - food.w) / 2) * p;
+      const y = top + 2 * p - food.h * p;
+      props.push({ base, draw: (ctx) => drawSprite(ctx, food, x, y, p) });
+    }
+    if (candle) {
+      const y = top + 2 * p - candle.h * p;
+      const spots = [2, TABLE_W - 2 - candle.w].map((x) => ({ s: candle, left: left + x * p, top: y }));
+      props.push({ base, draw: (ctx) => spots.forEach((o) => drawSprite(ctx, o.s, o.left, o.top, p)) });
+      candleGlow(env, spots, 9);
+    }
   }
 }
 
