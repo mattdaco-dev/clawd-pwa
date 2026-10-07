@@ -30,8 +30,8 @@ porte les réglages, gardés dans le navigateur :
 - Décor : aucun ou open space (la plage viendra ensuite).
 - Disposition, avec un décor : « Salles » (une pièce par session, la page défile quand il y en a
   trop) ou « Open space partagé » (un seul bureau, tout le monde partage les postes). Les salles
-  forment le plan d'un étage : murs partagés, tailles un peu différentes, couloirs sous certaines
-  salles, passages entre voisines et entrée du bâtiment en bas. Les Clawd restent dans leur salle.
+  forment le plan d'un étage : murs partagés, tailles un peu différentes, bords irréguliers,
+  couloirs à cadres sous certaines salles, passages entre voisines et entrée du bâtiment en bas. Les Clawd restent dans leur salle.
 - Taille des pixels : de 3 à 6 px, décor compris. Les subagents ont toujours un pixel de moins.
 
 L'open space suit l'heure locale : ciel orangé au coucher du soleil, nuit étoilée dans les fenêtres

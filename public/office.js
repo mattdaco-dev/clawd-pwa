@@ -621,6 +621,44 @@ const PAINTING = sprite([
   'DDDDDDDDDDDD',
 ]);
 
+// Small pictures for the hallways, and now and then a room.
+const FRAMES = [
+  sprite([ // landscape
+    'DDDDDDDD',
+    'DSSSSYSD',
+    'DSSSSSSD',
+    'DSSPSSSD',
+    'DPPPPPSD',
+    'DDDDDDDD',
+  ]),
+  sprite([ // a portrait of a Clawd
+    'HHHHHHH',
+    'HwwwwwH',
+    'HTTTTTH',
+    'HTETETH',
+    'TTTTTTT',
+    'HTwTwTH',
+    'HHHHHHH',
+  ]),
+  sprite([ // abstract
+    'KKKKKKK',
+    'KRRWBBK',
+    'KRRWBBK',
+    'KWWWWWK',
+    'KYYWRRK',
+    'KKKKKKK',
+  ]),
+  sprite([ // flower
+    'AAAAAA',
+    'AWRWWA',
+    'ARYRWA',
+    'AWRWWA',
+    'AWPWWA',
+    'AWPPWA',
+    'AAAAAA',
+  ]),
+];
+
 const FRIDGE = sprite([
   'AAAAAAAAAA',
   'AWWWWWWWWA',
@@ -1133,6 +1171,13 @@ function furnish(g, { x0, x1, top, bottom, name, seed, maxPerRow, maxRows }, env
   }
   const widest = bare.reduce((a, b) => (b.w > a.w ? b : a));
   if (withClock && widest.w >= u(56)) clocks.push({ x: widest.x, y: top + Math.round(wallH * between(0.4, 0.55)) });
+  // Now and then a small picture in another stretch of bare wall.
+  const spare = bare.filter((b) => b !== widest && b.w >= u(60));
+  if (spare.length && chance(0.3)) {
+    const frame = pickOne(FRAMES);
+    const at = pickOne(spare);
+    drawSprite(g, frame, Math.round(at.x - (frame.w * p) / 2), Math.round(top + wallH * 0.38), p);
+  }
   // No bare wall wide enough: higher up, over the first bookshelf.
   else if (withClock) clocks.push({ x: firstShelf + (SHELF.w * p) / 2, y: top + Math.round(wallH * 0.28) });
 
@@ -1616,16 +1661,32 @@ const WALL_EDGE = '#4f4338';
 const THRESHOLD = '#c9b48f';
 const HALL_THEME = { wall: '#ece6d8', wallLow: '#e2dac8', wallStyle: 'plain', base: '#d3cab6', floor: '#efe8da', line: '#e2d9c7', floorStyle: 'tiles' };
 
-// A hallway under a short room: a low wall, tiles, a runner and a plant or two.
-function paintHall(g, { x0, x1, top, bottom }, seed, { p, u }) {
+// A hallway under a short room: a low wall hung with a few pictures, tiles and
+// a plant or two.
+function paintHall(g, { x0, x1, top, bottom, door }, seed, { p, u }) {
   const random = seeded(seed);
   const look = dressing(THEMES[0], random);
   const wallH = Math.min(u(60), Math.round((bottom - top) * 0.4));
   paintArea(g, x0, top, x1 - x0, bottom - top, wallH, u, HALL_THEME);
-  const floorMid = Math.round((top + wallH + bottom) / 2);
-  const runnerW = Math.round((x1 - x0) * (0.4 + random() * 0.3));
-  const rug = { ...look.rug(), style: random() < 0.5 ? 'stripes' : 'frame' }; // round or chequered runners look odd this long
-  paintRug(g, Math.round(x0 + (x1 - x0) / 2), floorMid, runnerW, Math.min(u(46), Math.round((bottom - top - wallH) * 0.5)), rug, p);
+  // The doorway from the room above cuts through the low wall.
+  g.fillStyle = HALL_THEME.floor;
+  g.fillRect(door.x, top, door.w, wallH);
+  g.fillStyle = WALL_EDGE;
+  g.fillRect(door.x - p, top, p, wallH);
+  g.fillRect(door.x + door.w, top, p, wallH);
+  // Pictures along the wall, clear of the doorway and of the plants at the ends.
+  const spots = [];
+  for (let x = x0 + u(90); x < x1 - u(110); x += u(70)) {
+    if (x + u(50) > door.x - u(20) && x < door.x + door.w + u(20)) continue;
+    spots.push(x);
+  }
+  for (const x of spots) {
+    if (random() < 0.45) continue;
+    const frame = FRAMES[Math.floor(random() * FRAMES.length)];
+    const fh = frame.h * p;
+    if (fh > wallH - u(8)) continue;
+    drawSprite(g, frame, Math.round(x + u(random() * 16)), Math.round(top + (wallH - u(6) - fh) / 2), p);
+  }
   // Plants against the low wall, cut at the wall above if they are too tall.
   g.save();
   g.beginPath();
@@ -1688,9 +1749,12 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     const widths = Array.from({ length: n }, (_, i) => Math.round(roomMax * vary(i, 'w', 0.84)));
     const tall = u(800);
     const inRow = (r) => Array.from({ length: Math.min(cols, n - r * cols) }, (_, k) => r * cols + k);
+    // Each row slides a little sideways, so the left and right sides are ragged too.
+    const shift = Array.from({ length: rows }, (_, r) => (rows > 1 ? Math.round(u(70) * vary(r * cols, 'shift', 0)) : 0));
     const rowW = (r) => inRow(r).reduce((sum, i) => sum + widths[i] + wallT, wallT);
-    const planW = Math.max(...Array.from({ length: rows }, (_, r) => rowW(r)));
+    const planW = Math.max(...Array.from({ length: rows }, (_, r) => shift[r] + rowW(r)));
     const left0 = Math.round((width - planW) / 2) + wallT;
+    const topExtra = u(60); // the top row's rooms start a little lower or higher
     const cells = []; // rooms, then the hallways under the short ones
     const rooms = [];
     let rowTop = margin + wallT;
@@ -1700,16 +1764,24 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
       // bottom to a hallway; the last row keeps a ragged edge instead.
       const pick = inRow(r).map((i) => vary(i, 'hall', 0));
       const hallFor = (k) => !last && (pick[k] < 0.5 || pick[k] === Math.min(...pick));
-      let x0 = left0;
+      const rowH = tall + (r === 0 ? topExtra : 0);
+      let x0 = left0 + shift[r];
       inRow(r).forEach((i, k) => {
         const hallH = Math.round(u(120) + u(50) * vary(i, 'hall-h', 0));
-        const h = last ? Math.round(tall * vary(i, 'h', 0.85)) : hallFor(k) ? tall - hallH - wallT : tall;
-        const room = { x0, x1: x0 + widths[i], top: rowTop, bottom: rowTop + h, r, c: k, i };
-        if (hallFor(k)) cells.push({ x0, x1: room.x1, top: room.bottom + wallT, bottom: rowTop + tall, r, c: k, hall: true, i });
+        const top = rowTop + (r === 0 ? Math.round(topExtra * vary(i, 'top', 0)) : 0);
+        const bottom = last ? top + Math.round(tall * vary(i, 'h', 0.85)) : hallFor(k) ? rowTop + rowH - hallH - wallT : rowTop + rowH;
+        const room = { x0, x1: x0 + widths[i], top, bottom, r, c: k, i };
+        if (hallFor(k)) {
+          // Where the hallway opens onto the room above, chosen now so its
+          // pictures keep clear of it.
+          const w = u(80);
+          const door = { x: Math.round(x0 + u(140) + vary(i, 'hall-door', 0) * (widths[i] - u(220) - w)), w };
+          cells.push({ x0, x1: room.x1, top: bottom + wallT, bottom: rowTop + rowH, r, c: k, hall: true, i, door });
+        }
         rooms.push(room);
         x0 = room.x1 + wallT;
       });
-      rowTop += tall + wallT;
+      rowTop += rowH + wallT;
     }
     cells.unshift(...rooms);
     const planBottom = Math.max(...cells.map((cell) => cell.bottom));
@@ -1763,12 +1835,8 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
         const h = Math.min(u(90), high - low);
         if (h >= u(50)) opening(cell.x1, low + random() * (high - low - h), next.x0 - cell.x1, h, false);
       }
-      if (cell.hall) {
-        // A hallway opens onto the room above it.
-        const room = rooms.find((other) => other.i === cell.i && !other.hall);
-        const w = u(80);
-        opening(room.x0 + u(140) + random() * (room.x1 - room.x0 - u(220) - w), room.bottom, w, wallT, true);
-      }
+      // A hallway opens onto the room above it.
+      if (cell.hall) opening(cell.door.x, cell.top - wallT, cell.door.w, wallT, true);
     }
     // The way in: a gap in the bottom wall of the first room of the last row,
     // a mat and a path out to the street.
