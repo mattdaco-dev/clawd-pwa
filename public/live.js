@@ -4,8 +4,8 @@ import { DECORS, DEFAULT_SETTINGS } from './decor.js';
 import { drawLight, seasonOf } from './office.js';
 import { currentWeather } from './weather.js';
 
-// Subagents are drawn one pixel size smaller than their main agent.
-const scaleFor = (kind, px) => (kind === 'main' ? px : Math.max(2, px - 1));
+// Subagents are drawn one pixel size smaller than their main agent (at 1, both are 1).
+const scaleFor = (kind, px) => (kind === 'main' ? px : Math.max(1, px - 1));
 const FEET = FRAME_H - 1; // rows from the top of a frame down to below the feet
 const CENTER = 15.5; // frame column under the middle of Clawd's body
 const HALF_BODY = 10; // body half-width in sprite pixels, arms included

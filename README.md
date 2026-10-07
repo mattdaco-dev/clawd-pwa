@@ -28,7 +28,8 @@ inventées, sans Claude Code) et Galerie (toutes les animations regroupées par 
 sa propre barre de réglages : décor, disposition, taille des pixels, heure, météo, saison, un
 bouton pour régénérer le décor, et la liste des sessions. On y ajoute ou ferme des Clawd et des
 sous-agents, on les laisse suivre le scénario en boucle ou on force leur état et leur activité, et
-on déclenche une erreur d'outil. Le même menu
+on déclenche une erreur d'outil. « Tout au hasard » tire une configuration complète, « Réinitialiser »
+revient aux réglages du menu et aux trois sessions du scénario. Le même menu
 porte les réglages, gardés dans le navigateur :
 
 - Décor : aucun ou open space (la plage viendra ensuite).
@@ -37,7 +38,8 @@ porte les réglages, gardés dans le navigateur :
   forment le plan d'un étage : murs partagés, tailles un peu différentes, bords irréguliers,
   couloirs sous certaines salles (parfois derrière une baie vitrée), passages de tailles variées
   entre voisines et entrée du bâtiment en bas. Les Clawd restent dans leur salle.
-- Taille des pixels : de 3 à 6 px, décor compris. Les subagents ont toujours un pixel de moins.
+- Taille des pixels : de 1 à 6 px, décor compris. Les subagents ont un pixel de moins (à 1 px, la
+  même taille).
 
 L'open space suit l'heure locale : ciel orangé au coucher du soleil, nuit étoilée dans les fenêtres
 et lampes allumées de 21 h à 6 h. La nuit, un Clawd qui travaille allume sa lumière : lampe de bureau ou

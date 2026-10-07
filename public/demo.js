@@ -47,11 +47,35 @@ export function createDemoModel() {
     },
     addSub(session) {
       if (session.subs.length >= MAX_SUBS) return;
-      const type = SUB_TYPES[Math.floor(Math.random() * SUB_TYPES.length)];
+      const free = SUB_TYPES.filter((t) => !session.subs.some((sub) => sub.type === t));
+      const type = free[Math.floor(Math.random() * free.length)];
       session.subs.push({ id: `s${nextId++}`, type, mode: 'auto', activity: 'search', offset: Math.floor(Math.random() * SUB_SCRIPT.length), errorAt: null });
     },
     removeSub(session, sub) {
       session.subs.splice(session.subs.indexOf(sub), 1);
+    },
+    // Back to the three scripted sessions. Ids keep counting, so the new
+    // Clawds walk in rather than taking over the old ones.
+    reset() {
+      sessions.length = 0;
+      for (let i = 0; i < 3; i++) model.addSession();
+    },
+    // A random cast: sessions pinned or scripted, with subagents here and there.
+    randomize() {
+      sessions.length = 0;
+      const pickOne = (list) => list[Math.floor(Math.random() * list.length)];
+      for (let n = 2 + Math.floor(Math.random() * 6); n > 0; n--) {
+        model.addSession();
+        const s = sessions[sessions.length - 1];
+        s.mode = pickOne(Object.keys(MAIN_STATES));
+        s.activity = pickOne(Object.keys(ACTIVITIES));
+        for (let k = Math.floor(Math.random() * 3); k > 0; k--) {
+          model.addSub(s);
+          const sub = s.subs[s.subs.length - 1];
+          sub.mode = pickOne(Object.keys(SUB_STATES));
+          sub.activity = pickOne(Object.keys(ACTIVITIES));
+        }
+      }
     },
     // The same shape as a server snapshot.
     snapshot(seconds) {
@@ -81,7 +105,7 @@ export function createDemoModel() {
       return `démo · ${n} session${n > 1 ? 's' : ''}${subs ? ` · ${subs} sous-agent${subs > 1 ? 's' : ''} ajouté${subs > 1 ? 's' : ''}` : ''}`;
     },
   };
-  for (let i = 0; i < 3; i++) model.addSession();
+  model.reset();
   return model;
 }
 
@@ -96,8 +120,12 @@ const options = (map, current) => Object.entries(map)
 
 // The bar under the demo scene. `scene` is the demo's createLive().
 export function createDemoBar(root, model, scene, settings) {
-  let current = { ...settings };
-  let view = { hour: 'auto', weather: 'auto', season: 'auto' };
+  let base = { ...settings }; // the menu's settings, what a reset goes back to
+  let current = { ...base };
+  const START_VIEW = { hour: 'auto', weather: 'auto', season: 'auto' };
+  let view = { ...START_VIEW };
+  const pickOne = (list) => list[Math.floor(Math.random() * list.length)];
+  const newSalt = () => Math.random().toString(36).slice(2, 8);
   const bar = document.createElement('div');
   bar.className = 'demo-bar';
   root.querySelector('.live-bar').before(bar);
@@ -120,6 +148,8 @@ export function createDemoBar(root, model, scene, settings) {
         <span class="demo-label">Décor</span>${seg('decor', Object.fromEntries(Object.entries(DECORS).map(([k, d]) => [k, d.label])), current.decor)}
         <span class="demo-label">Disposition</span>${seg('layout', LAYOUTS, current.layout, current.decor === 'none')}
         <span class="demo-label">Pixels</span>${seg('px', Object.fromEntries(PIXEL_SIZES.map((n) => [n, n])), current.px)}
+        <button type="button" data-act="randomize" title="Décor, heure, météo, saison et sessions au hasard">Tout au hasard</button>
+        <button type="button" data-act="reset" title="Réglages du menu et les trois sessions du scénario">Réinitialiser</button>
         <button type="button" data-act="reseed"${current.decor === 'none' ? ' disabled' : ''}>Régénérer le décor</button>
       </div>
       <div class="demo-row">
@@ -190,7 +220,31 @@ export function createDemoBar(root, model, scene, settings) {
     const el = e.target.closest('button[data-act]');
     if (!el) return;
     const act = el.dataset.act;
-    if (act === 'reseed') scene.setView({ salt: Math.random().toString(36).slice(2, 8) });
+    if (act === 'reseed') scene.setView({ salt: newSalt() });
+    else if (act === 'reset') {
+      current = { ...base };
+      view = { ...START_VIEW };
+      scene.setSettings(current);
+      scene.setView({ salt: '' });
+      applyView();
+      model.reset();
+    } else if (act === 'randomize') {
+      // Mostly with furniture: the bare decor shows little of the rest.
+      current = {
+        decor: Math.random() < 0.85 ? 'open-space' : 'none',
+        layout: pickOne(Object.keys(LAYOUTS)),
+        px: pickOne(PIXEL_SIZES),
+      };
+      view = {
+        hour: pickOne(HOURS)[0],
+        weather: pickOne(Object.keys(WEATHERS)),
+        season: pickOne(Object.keys(SEASONS)),
+      };
+      scene.setSettings(current);
+      scene.setView({ salt: newSalt() });
+      applyView();
+      model.randomize();
+    }
     else if (act === 'add-session') model.addSession();
     else {
       const { session, sub } = target(el);
@@ -206,6 +260,7 @@ export function createDemoBar(root, model, scene, settings) {
   return {
     // The menu's settings reach the demo too.
     setSettings(next) {
+      base = { ...next };
       current = { ...next };
       scene.setSettings(current);
       render();

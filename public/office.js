@@ -1895,7 +1895,7 @@ export function buildOffice(width, viewHeight, names, { px = 5, layout = 'rooms'
     const gateX = Math.round(hallway.x0 + (hallway.x1 - hallway.x0) * 0.36);
     opening(gateX, hallway.bottom, gateW, wallT + px, true);
     g.fillStyle = '#c9c0ac';
-    g.fillRect(gateX, hallway.bottom + wallT + px, gateW, height - hallway.bottom);
+    g.fillRect(gateX, hallway.bottom + wallT + px, gateW, Math.max(12, u(56)));
     g.fillStyle = INK.H;
     g.fillRect(gateX + u(6), hallway.bottom + wallT + px + u(6), gateW - u(12), u(14));
   }
