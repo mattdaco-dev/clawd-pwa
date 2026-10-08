@@ -310,6 +310,23 @@ export const ANIMS = {
       } else stamp(p, 18, 0, ['GGG', '.H.', '.H.']);
     }),
   },
+  // Building site: spreading the screed for the floor, a shovelful at a time.
+  shovel: {
+    label: 'Étale à la pelle',
+    fps: 5,
+    loop: true,
+    frames: frames(6, (f, i) => {
+      const phase = i % 3;
+      const p = clawd(f, { eyes: phase === 2 ? 'happy' : 'down', left: phase === 0 ? 'press' : 'mid', right: phase === 0 ? 'press' : phase === 1 ? 'mid' : 'lift' });
+      // The handle runs from the hands down to the blade, then the blade and its load.
+      const [hx, hy, bx, by] = [[17, 4, 20, 8], [17, 2, 20, 5], [17, 1, 20, 2]][phase];
+      for (let k = 0; k <= 3; k++) p(hx + k, hy + Math.round(((by - hy) * k) / 3), 'H');
+      stamp(p, bx, by, ['GG', 'GG']);
+      if (phase === 1) stamp(p, bx - 1, by - 1, ['OOO']);
+      if (phase === 2) for (const [x, y] of [[23, -1], [24, 1], [22, -3]]) p(x, y, 'O');
+      if (phase === 0) for (const [x, y] of [[22, 9], [23, 9], [19, 9]]) p(x, y, 'O');
+    }),
+  },
   // Building site, waiting for an answer: a STOP sign waved overhead.
   stop: {
     label: 'Panneau STOP',
@@ -979,6 +996,7 @@ export const GROUPS = [
     items: [
       ['trowel', 'Monte les murs, une rangée de briques par outil utilisé'],
       ['hammer', 'Pose les ouvertures, le sol et le mobilier'],
+      ['shovel', 'Pose le sol, une dalle sur deux en moyenne (sinon au marteau)'],
       ['stop', 'Attend un input pendant le chantier'],
     ],
   },

@@ -16,7 +16,9 @@ const COURSE = 2; // a course of bricks
 const BRICK_W = 4;
 const SIDE = 3; // walls seen from above
 const SEGMENTS = 6; // steps per side wall and for the front wall
-const FLOOR_STEPS = 4;
+// The floor goes down patch by patch, from the back wall to the front, in a snake.
+const FLOOR_COLS = 4;
+const FLOOR_ROWS = 4;
 const DOOR_W = 14;
 const WINDOW = { w: 14, h: 9, top: 5 };
 // The demo's steps: about 0.9 s each, with the same rushes and breaks as the real sites.
@@ -304,9 +306,18 @@ function plotRoom(i, { colW, height, p, name, plan, random }) {
   }
   steps.push({ kind: 'door', anim: 'hammer', spot: inside(doorCx, iy1) });
   windows.forEach((w, k) => steps.push({ kind: 'window', k, anim: 'hammer', spot: inside(w.x + (WINDOW.w * p) / 2, wallBase) }));
-  for (let k = 0; k < FLOOR_STEPS; k++) {
-    const y = wallBase + ((iy1 - wallBase) * (k + 0.5)) / FLOOR_STEPS;
-    steps.push({ kind: 'floor', k, anim: 'hammer', spot: inside(left + roomW * (k % 2 ? 0.65 : 0.35), y) });
+  room.patches = [];
+  for (let r = 0; r < FLOOR_ROWS; r++) {
+    for (let c = 0; c < FLOOR_COLS; c++) {
+      const col = r % 2 ? FLOOR_COLS - 1 - c : c;
+      const x0 = Math.round(ix0 + ((ix1 - ix0) * col) / FLOOR_COLS);
+      const x1 = Math.round(ix0 + ((ix1 - ix0) * (col + 1)) / FLOOR_COLS);
+      const y0 = Math.round(wallBase + ((iy1 - wallBase) * r) / FLOOR_ROWS);
+      const y1 = Math.round(wallBase + ((iy1 - wallBase) * (r + 1)) / FLOOR_ROWS);
+      room.patches.push({ x0, x1, y0, y1 });
+      // A shovel for the screed or a hammer for the boards, at random.
+      steps.push({ kind: 'floor', anim: random() < 0.5 ? 'shovel' : 'hammer', spot: inside((x0 + x1) / 2, (y0 + y1) / 2 + 4 * p) });
+    }
   }
   items.forEach((it, k) => {
     const below = it.place === 'floor' ? it.base + 4 * p : wallBase + 6 * p;
@@ -324,8 +335,8 @@ function paintRoom(g, room) {
   const seam = Math.max(1, Math.round(p / 3));
   const done = room.done;
 
-  const floorRows = done('floor');
-  if (floorRows < FLOOR_STEPS) {
+  const patches = done('floor');
+  if (patches < room.patches.length) {
     // The setting out, in chalk, until the floor covers it.
     g.strokeStyle = CHALK;
     g.lineWidth = Math.max(1, p / 2);
@@ -344,9 +355,14 @@ function paintRoom(g, room) {
     }
     g.setLineDash([]);
   }
-  if (floorRows) {
-    const h = ((iy1 - wallBase) * floorRows) / FLOOR_STEPS;
-    paintFloor(g, floor, ix0, wallBase, ix1 - ix0, Math.round(h), p);
+  // Painted whole and clipped to the patches laid, so the pattern runs on across them.
+  if (patches) {
+    g.save();
+    g.beginPath();
+    for (const r of room.patches.slice(0, patches)) g.rect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
+    g.clip();
+    paintFloor(g, floor, ix0, wallBase, ix1 - ix0, iy1 - wallBase, p);
+    g.restore();
   }
 
   // Back wall, course by course from the ground up.
