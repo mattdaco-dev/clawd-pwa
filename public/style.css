@@ -69,6 +69,14 @@ body {
   border-radius: 10px;
   background: var(--bg);
   box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+  /* Below the button (12 + 36 + 6px), stops 8px short of the viewport bottom and scrolls. */
+  max-height: calc(100dvh - 62px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.menu nav > * {
+  flex-shrink: 0;
 }
 
 .menu nav[hidden] {
