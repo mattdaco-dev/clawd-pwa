@@ -4,6 +4,7 @@
 // stations, depth-sorted props and an overlay drawn every frame.
 import { bareDesk, buildOffice } from './office.js';
 import { WORLDS } from './outdoors.js';
+import { buildSite } from './site.js';
 
 export const LAYOUTS = { rooms: 'Salles', shared: 'Open space partagé' };
 export const PIXEL_SIZES = [1, 2, 3, 4, 5, 6];
@@ -47,5 +48,6 @@ function buildBare(width, height, names, { px, desk = 'off', salt = '' }) {
 
 export const DECORS = {
   none: { label: 'Aucun', build: buildBare },
-  'open-space': { label: 'Open space', build: buildOffice },
+  'open-space': { label: 'Avec', build: buildOffice },
+  chantier: { label: 'Chantier', build: buildSite },
 };

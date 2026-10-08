@@ -2464,3 +2464,6 @@ function drawClock(ctx, { x, y }, date, u) {
   ctx.fillStyle = INK.R;
   ctx.fillRect(x - 1, y - 1, 2, 2);
 }
+
+// Furniture the building site decor (site.js) puts in the rooms it builds.
+export const SITE_KIT = { DESK, DESK_SURFACE, SHELF, BOARD, PLANT, CABINET, COOLER, PAINTING, seeded };

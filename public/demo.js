@@ -163,8 +163,8 @@ export function createDemoBar(root, model, scene, settings) {
       <div class="demo-row">
         <span class="demo-label">Décor</span>${seg('decor', Object.fromEntries(Object.entries(DECORS).map(([k, d]) => [k, d.label])), current.decor)}
         <span class="demo-label">Bureau</span>${seg('desk', { off: 'Non', on: 'Oui' }, current.desk, current.decor !== 'none')}
-        <span class="demo-label">Disposition</span>${seg('layout', LAYOUTS, current.layout, current.decor === 'none')}
-        <label class="demo-label">Extérieur <select data-setting="outside"${current.decor === 'none' ? ' disabled' : ''}>${options(OUTSIDES, current.outside)}</select></label>
+        <span class="demo-label">Disposition</span>${seg('layout', LAYOUTS, current.layout, current.decor !== 'open-space')}
+        <label class="demo-label">Extérieur <select data-setting="outside"${current.decor !== 'open-space' ? ' disabled' : ''}>${options(OUTSIDES, current.outside)}</select></label>
         <span class="demo-label">Pixels</span>${seg('px', Object.fromEntries(PIXEL_SIZES.map((n) => [n, n])), current.px)}
         <button type="button" data-act="randomize" title="Décor, disposition, extérieur, heure, météo, saison et sessions au hasard ; la taille des pixels ne change pas">Tout au hasard</button>
         <button type="button" data-act="reset" title="Réglages du menu et les trois sessions du scénario">Réinitialiser</button>

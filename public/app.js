@@ -46,7 +46,7 @@ function renderSettings() {
   for (const input of menu.querySelectorAll('.setting input')) {
     input.checked = String(settings[input.name]) === input.value;
   }
-  for (const set of menu.querySelectorAll('[data-needs-decor]')) set.hidden = settings.decor === 'none';
+  for (const set of menu.querySelectorAll('[data-needs-decor]')) set.hidden = settings.decor !== 'open-space';
   for (const set of menu.querySelectorAll('[data-needs-bare]')) set.hidden = settings.decor !== 'none';
 }
 
@@ -57,6 +57,7 @@ for (const input of menu.querySelectorAll('.setting input')) {
       if ((await Notification.requestPermission()) !== 'granted') return renderSettings();
     }
     settings = { ...settings, [input.name]: input.name === 'px' ? Number(input.value) : input.value };
+    if (input.name === 'decor') connect();
     live.setSettings(settings);
     demoBar.setSettings(settings);
     renderSettings();
@@ -87,14 +88,20 @@ function route() {
 window.addEventListener('hashchange', route);
 route();
 
-const events = new EventSource('/events');
-events.onopen = () => live.setConnected(true);
-events.onerror = () => live.setConnected(false);
-events.onmessage = (e) => {
-  const snapshot = JSON.parse(e.data);
-  live.setSnapshot(snapshot);
-  showWaiting(snapshot);
-};
+// Watching in building site mode is what keeps the sites going: the server is told.
+let events = null;
+function connect() {
+  events?.close();
+  events = new EventSource(settings.decor === 'chantier' ? '/events?site=1' : '/events');
+  events.onopen = () => live.setConnected(true);
+  events.onerror = () => live.setConnected(false);
+  events.onmessage = (e) => {
+    const snapshot = JSON.parse(e.data);
+    live.setSnapshot(snapshot);
+    showWaiting(snapshot);
+  };
+}
+connect();
 
 const WAIT_REASONS = {
   AskUserQuestion: 'a une question',

@@ -264,6 +264,16 @@ for (const [season, { colors, vertical }] of Object.entries(FLAGS)) {
     },
   };
 }
+// Building site mode: a yellow hard hat for every main Clawd, orange for the helpers.
+const HARD_HAT = (c, d) => hat([
+  `....${c.repeat(7)}....`,
+  `...${c.repeat(9)}...`,
+  `..${c.repeat(4)}W${c.repeat(6)}..`,
+  `..${c.repeat(11)}..`,
+  `${d.repeat(15)}`,
+]);
+export const HARD_HATS = { main: { hat: HARD_HAT('Y', 'M') }, sub: { hat: HARD_HAT('o', 'n') } };
+
 // More of them dress up for carnival, everybody waves a flag on a national day.
 const SHARE = { fuesend: 80, 'fete-lu': 50, 'fete-fr': 50, 'fete-be': 50, 'fete-de': 50, printemps: 20, ete: 30, automne: 25, hiver: 35 };
 

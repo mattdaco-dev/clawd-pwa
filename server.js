@@ -1,7 +1,7 @@
 // Local hub: receives Claude Code hook payloads, keeps one state per agent and
 // streams snapshots to the PWA over server-sent events.
 import { createServer } from 'node:http';
-import { open, readFile } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,6 +28,112 @@ const SUBAGENT_TTL = 30 * 60_000;
 
 const sessions = new Map();
 const clients = new Set();
+
+// Building site mode: each session builds a room after its launch directory.
+// The steps done per directory are kept on disk, so a reload (or a later
+// session in the same project) picks the work up where it was. The site only
+// moves while a PWA watches it in that mode: a step per tool call, and at
+// least one every SITE_PACE.
+const SITE_FILE = join(dirname(fileURLToPath(import.meta.url)), 'data', 'site.json');
+const SITE_PACE = 15_000;
+const SITE_MAX = 999;
+const RESCAN_EVERY = 30_000;
+// Counted apart: present or not, never walked into.
+const HEAVY = new Set(['node_modules', 'vendor', '.venv', 'venv', '__pycache__', 'dist', 'build', 'target', '.next', '.nuxt', '.cache', 'coverage', '.git', '.gradle', '.idea', '.vscode']);
+const LANGS = {
+  js: 'js', mjs: 'js', cjs: 'js', jsx: 'js', ts: 'js', tsx: 'js', vue: 'js', svelte: 'js',
+  py: 'py', rs: 'metal', go: 'metal', c: 'metal', h: 'metal', cpp: 'metal', zig: 'metal',
+  java: 'jvm', kt: 'jvm', scala: 'jvm', rb: 'ruby', php: 'php', swift: 'swift', cs: 'jvm',
+  md: 'doc', html: 'js', css: 'js',
+};
+let siteSteps = {};
+try {
+  siteSteps = JSON.parse(await readFile(SITE_FILE, 'utf8'));
+} catch {}
+let siteSaving = null;
+function saveSite() {
+  siteSaving ??= setTimeout(async () => {
+    siteSaving = null;
+    try {
+      await mkdir(dirname(SITE_FILE), { recursive: true });
+      await writeFile(SITE_FILE, JSON.stringify(siteSteps));
+    } catch {}
+  }, 2000);
+}
+
+// What the directory holds, roughly: its folders with their file counts, the
+// heavy ones it has, its top-level files and the language most files are in.
+async function scanDir(dir) {
+  const budget = { left: 5000 };
+  const langs = {};
+  const count = async (path, depth) => {
+    let n = 0;
+    let entries = [];
+    try {
+      entries = await readdir(path, { withFileTypes: true });
+    } catch {
+      return 0;
+    }
+    for (const e of entries) {
+      if (budget.left-- <= 0) break;
+      if (e.isDirectory()) {
+        if (depth < 4 && !HEAVY.has(e.name) && !e.name.startsWith('.')) n += await count(join(path, e.name), depth + 1);
+      } else if (e.isFile()) {
+        n++;
+        const lang = LANGS[extname(e.name).slice(1).toLowerCase()];
+        if (lang && lang !== 'doc') langs[lang] = (langs[lang] ?? 0) + 1;
+      }
+    }
+    return n;
+  };
+  let entries = [];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const dirs = [];
+  const heavy = [];
+  const files = [];
+  for (const e of entries) {
+    if (e.isDirectory()) {
+      if (HEAVY.has(e.name)) heavy.push(e.name);
+      else if (e.name === '.github' || e.name === '.gitlab' || !e.name.startsWith('.')) dirs.push({ name: e.name, files: await count(join(dir, e.name), 1) });
+    } else if (e.isFile()) {
+      files.push(e.name);
+      const lang = LANGS[extname(e.name).slice(1).toLowerCase()];
+      if (lang && lang !== 'doc') langs[lang] = (langs[lang] ?? 0) + 1;
+    }
+  }
+  dirs.sort((a, b) => b.files - a.files || a.name.localeCompare(b.name));
+  const lang = Object.entries(langs).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const total = files.length + dirs.reduce((sum, d) => sum + d.files, 0);
+  return { files: total, lang, dirs: dirs.slice(0, 12), heavy, top: files.slice(0, 60) };
+}
+
+function rescan(s) {
+  if (!s.dir) return;
+  const dir = s.dir;
+  s.scannedAt = Date.now();
+  scanDir(dir).then((plan) => {
+    if (sessions.get(s.id) !== s || s.dir !== dir || !plan) return;
+    if (JSON.stringify(plan) === JSON.stringify(s.plan)) return;
+    s.plan = plan;
+    broadcast();
+  });
+}
+
+const siteWatched = () => [...clients].some((c) => c.site);
+
+function siteStep(s, now = Date.now()) {
+  s.stepAt = now;
+  if (!s.dir || !s.plan || !siteWatched()) return false;
+  const steps = siteSteps[s.dir] ?? 0;
+  if (steps >= SITE_MAX) return false;
+  siteSteps[s.dir] = steps + 1;
+  saveSite();
+  return true;
+}
 
 function activityFor(tool = '') {
   if (SEARCH_TOOLS.has(tool)) return 'search';
@@ -78,11 +184,13 @@ function sessionFor(p) {
     const now = Date.now();
     s = { id: p.session_id, name: basename(p.cwd ?? ''), dir: p.cwd ?? null, state: 'idle', since: now, activity: null, tool: null, startedAt: now, subagents: new Map() };
     sessions.set(s.id, s);
+    rescan(s);
     if (p.transcript_path) {
       launchDir(p.transcript_path).then((dir) => {
         if (dir && sessions.get(s.id) === s && dir !== s.dir) {
           s.name = basename(dir);
           s.dir = dir;
+          rescan(s);
           broadcast();
         }
       });
@@ -132,6 +240,9 @@ function apply(p) {
       else if (failed && !p.is_interrupt) agent.errorAt = Date.now();
       if (failed && !p.is_interrupt) agent.lastError = { tool: p.tool_name ?? null, at: Date.now() };
       if (agent.state === 'waiting') set(agent, 'working', activityFor(p.tool_name), p.tool_name);
+      siteStep(s);
+      // A new folder may just have appeared: the site grows with the project.
+      if (Date.now() - (s.scannedAt ?? 0) > RESCAN_EVERY && /^(Write|Edit|MultiEdit|NotebookEdit|Bash)$/.test(p.tool_name ?? '')) rescan(s);
       break;
     }
     case 'PreCompact':
@@ -161,7 +272,11 @@ function apply(p) {
 
 function snapshot() {
   return {
-    sessions: [...sessions.values()].map(({ subagents, beforeCompact, ...s }) => ({ ...s, subagents: [...subagents.values()] })),
+    sessions: [...sessions.values()].map(({ subagents, beforeCompact, plan, stepAt, scannedAt, ...s }) => ({
+      ...s,
+      site: plan ? { plan, steps: siteSteps[s.dir] ?? 0 } : null,
+      subagents: [...subagents.values()],
+    })),
   };
 }
 
@@ -184,6 +299,14 @@ setInterval(() => {
 setInterval(() => {
   for (const res of clients) res.write(': ping\n\n');
 }, 25_000);
+
+// The minimum pace of the building sites, between two tool calls.
+setInterval(() => {
+  const now = Date.now();
+  let changed = false;
+  for (const s of sessions.values()) if (now - (s.stepAt ?? 0) >= SITE_PACE) changed = siteStep(s, now) || changed;
+  if (changed) broadcast();
+}, 3000);
 
 async function serveStatic(pathname, res) {
   const file = normalize(join(PUBLIC, pathname === '/' ? 'index.html' : pathname));
@@ -215,6 +338,8 @@ createServer(async (req, res) => {
   }
 
   if (pathname === '/events') {
+    // Watching in building site mode is what keeps the sites going.
+    res.site = new URL(req.url, 'http://localhost').searchParams.get('site') === '1';
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
     res.write(`data: ${JSON.stringify(snapshot())}\n\n`);
     clients.add(res);

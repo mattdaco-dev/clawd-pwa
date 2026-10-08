@@ -3,7 +3,7 @@ import { PALETTES, cycleDone, fitCanvas, frameIndex } from './render.js';
 import { DECORS, DEFAULT_SETTINGS } from './decor.js';
 import { daylight, drawLight, lightLevel, seasonOf } from './office.js';
 import { currentWeather } from './weather.js';
-import { costumeFor, drawDressed } from './costumes.js';
+import { HARD_HATS, costumeFor, drawDressed } from './costumes.js';
 import { Cat } from './cat.js';
 import { worldOfDay } from './outdoors.js';
 
@@ -47,6 +47,9 @@ const STRETCH_CHANCE = 0.15;
 const BREAK_EVERY = 30 * 60_000;
 const BREAK = { station: 'coffee', anims: ['coffee'] };
 const WAIT = { station: 'front', anims: ['flag', 'bubble', 'wave'] };
+// Building site: the work goes on where the next bricks go; a STOP sign to wait.
+const BUILD = { station: 'build', anims: ['hammer'] };
+const WAIT_SITE = { station: 'front', anims: ['stop', 'stop', 'bubble'] };
 const SLEEP = { station: 'beanbag', anims: ['sleep'] };
 const IDLE = [
   [{ station: null, wander: true, anims: ['breathe', 'look'] }, 40],
@@ -248,6 +251,7 @@ class Critter {
   planFor(now) {
     this.onBreak = false;
     if (this.state === 'working') {
+      if (this.zone?.building) return BUILD;
       if (this.workingSince && now - (this.lastBreak ?? this.workingSince) > BREAK_EVERY && this.activity !== 'compact') {
         this.lastBreak = now;
         this.onBreak = true;
@@ -255,7 +259,7 @@ class Critter {
       }
       return WORK[this.activity] ?? WORK.type;
     }
-    if (this.state === 'waiting') return WAIT;
+    if (this.state === 'waiting') return this.zone?.site ? WAIT_SITE : WAIT;
     if (now - this.idleSince > sleepAfter()) return SLEEP;
     return weighted(IDLE);
   }
@@ -264,6 +268,11 @@ class Critter {
     const plan = this.planFor(now);
     const stay = plan.station && this.plan?.station === plan.station;
     this.plan = plan;
+    if (stay && this.slot?.moves) {
+      // A place that moves with the work: catch up with it first.
+      const spot = this.slot.spot(this.scale);
+      if (Math.hypot(spot.x - this.x, spot.y - this.y) > 4 * this.scale) return this.walkTo(spot, zone);
+    }
     if (stay) return this.perform();
 
     this.release();
@@ -838,6 +847,8 @@ function cardHtml(c) {
     <dl>${rows.join('')}</dl>`;
 }
 
+const planKey = (plan) => (plan ? `${plan.files}:${plan.lang}:${plan.dirs.map((d) => d.name).join(',')}:${plan.heavy.join(',')}:${plan.top.length}` : '');
+
 // Flattens a server snapshot into one entry per agent, main agents first.
 function agentsOf(snapshot) {
   const agents = [];
@@ -906,10 +917,12 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     const { decor, layout, px, outside = 'random', desk = 'off' } = settings;
     season = view.season === 'auto' ? seasonOf(sceneDate(view.hour)) : view.season;
     const world = outside === 'random' ? worldOfDay(sceneDate(view.hour), view.salt) : outside;
-    const key = `${decor}|${desk}|${layout}|${px}|${season}|${world}|${view.salt}|${width}x${viewHeight}|${names.join('|')}`;
+    // The building site is laid out after each session's directory.
+    const sites = decor === 'chantier' ? sessions.map((s) => planKey(s.site?.plan)).join('|') : '';
+    const key = `${decor}|${desk}|${layout}|${px}|${season}|${world}|${view.salt}|${width}x${viewHeight}|${names.join('|')}|${sites}`;
     if (key === officeKey) return;
     officeKey = key;
-    office = (DECORS[decor] ?? DECORS[DEFAULT_SETTINGS.decor]).build(width, viewHeight, names, { layout, px, season, salt: view.salt, world, desk });
+    office = (DECORS[decor] ?? DECORS[DEFAULT_SETTINGS.decor]).build(width, viewHeight, names, { layout, px, season, salt: view.salt, world, desk, sessions, demo: !!demo });
     height = office.height;
     ctx = fitCanvas(canvas, width, height);
     for (const critter of critters.values()) {
@@ -965,6 +978,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     last = now;
     const current = demo ? demo.snapshot(Math.max(0, now - demoStart) / 1000) : snapshot;
     ensureOffice(current.sessions);
+    office.sync?.(current.sessions, now);
     const agents = agentsOf(current);
 
     for (const agent of agents) {
@@ -983,7 +997,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       critter.info = agent;
       critter.parent = agent.parent ? critters.get(agent.parent) ?? null : null;
       critter.zone = zone;
-      critter.costume = office.bare ? null : costumeFor(agent.key, season);
+      critter.costume = office.hats ? HARD_HATS[agent.kind] : office.bare ? null : costumeFor(agent.key, season);
       critter.update(now, dt, agent, zone);
     }
 

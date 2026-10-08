@@ -271,7 +271,57 @@ const CONFETTI = [
 
 // ---------------------------------------------------------------- animations
 
+// Building site tools.
+const BRICK = ['TTTT', 'UUUU'];
+const STOP_SIGN = ['.RRRRR.', 'RRRRRRR', 'RWWWWWR', 'RRRRRRR', '.RRRRR.'];
+
 export const ANIMS = {
+  // Building site: laying bricks with a trowel, a brick ready in the other hand.
+  trowel: {
+    label: 'Maçonne à la truelle',
+    fps: 5,
+    loop: true,
+    frames: frames(6, (f, i) => {
+      const down = i % 2 === 1;
+      const p = clawd(f, { eyes: i === 5 ? 'closed' : 'down', left: 'mid', right: down ? 'press' : 'mid' });
+      stamp(p, -4, 1, BRICK);
+      if (down) {
+        stamp(p, 18, 5, ['H..', 'GGG']);
+        p(20, 7, 'A');
+        p(21, 7, 'A');
+      } else {
+        stamp(p, 18, 0, ['.G', 'GG', 'GH', '.H']);
+      }
+    }),
+  },
+  // Building site: driving nails, sparks on every blow.
+  hammer: {
+    label: 'Cloue au marteau',
+    fps: 6,
+    loop: true,
+    frames: frames(6, (f, i) => {
+      const hit = i % 3 === 2;
+      const up = i % 3 === 0;
+      const p = clawd(f, { eyes: hit ? 'closed' : 'down', left: 'press', right: up ? 'high' : hit ? 'press' : 'mid' });
+      if (up) stamp(p, 16, -5, ['GGGG', '..H.', '..H.']);
+      else if (hit) {
+        stamp(p, 18, 4, ['H.', 'H.', 'GG', 'GG']);
+        for (const [x, y] of [[21, 6], [17, 8], [21, 9]]) p(x, y, 'Y');
+      } else stamp(p, 18, 0, ['GGG', '.H.', '.H.']);
+    }),
+  },
+  // Building site, waiting for an answer: a STOP sign waved overhead.
+  stop: {
+    label: 'Panneau STOP',
+    fps: 5,
+    loop: true,
+    frames: frames(6, (f, i) => {
+      const dy = i % 3 === 1 ? -1 : 0;
+      const p = clawd(f, { dy, eyes: i % 3 === 2 ? 'happy' : 'open', left: 'high', right: 'out', legs: dy ? 'tuck' : 'stand' });
+      for (let y = -6; y < 3; y++) p(1, y, 'K');
+      stamp(p, -2 + (i % 3 === 0 ? -1 : 0), -11, STOP_SIGN);
+    }),
+  },
   // Working
   'type-front': {
     label: 'Tape au clavier',
@@ -920,6 +970,16 @@ export const GROUPS = [
       ['read', 'Read, Grep, Glob, en alternance avec l\'enquête'],
       ['globe', 'WebFetch, WebSearch, outils MCP'],
       ['think', 'Prompt reçu (UserPromptSubmit), délégation à un subagent'],
+    ],
+  },
+  {
+    id: 'site',
+    label: 'Chantier',
+    hint: 'Mode chantier : la session construit sa salle d\'après la structure de son dossier.',
+    items: [
+      ['trowel', 'Monte les murs, une rangée de briques par outil utilisé'],
+      ['hammer', 'Pose les ouvertures, le sol et le mobilier'],
+      ['stop', 'Attend un input pendant le chantier'],
     ],
   },
   {
