@@ -19,7 +19,13 @@ const SEGMENTS = 6; // steps per side wall and for the front wall
 const FLOOR_STEPS = 4;
 const DOOR_W = 14;
 const WINDOW = { w: 14, h: 9, top: 5 };
-const DEMO_PACE = 900; // ms per step in the demo
+// The demo's steps: about 0.9 s each, with the same rushes and breaks as the real sites.
+function demoPauses(random) {
+  return Array.from({ length: 200 }, () => {
+    const r = random();
+    return r < 0.25 ? 250 + random() * 200 : r < 0.85 ? 600 + random() * 700 : 2000 + random() * 1500;
+  });
+}
 
 const GROUND = '#d6c49b';
 const GROUND_DOTS = ['#c3ae82', '#e2d4b0', '#b9a378'];
@@ -554,9 +560,16 @@ export function buildSite(width, height, names, { px = 4, salt = '', sessions = 
   }
 
   // Steps done per session: the server's, or the demo's clock.
+  function demoSteps(room, elapsed) {
+    room.pauses ??= demoPauses(seeded(`${salt}${room.name}#pace`));
+    let n = 0;
+    for (let t = room.pauses[0]; t <= elapsed && n < room.pauses.length - 1; t += room.pauses[++n]);
+    return n;
+  }
+
   function sync(list, now) {
     rooms.forEach((room, i) => {
-      const steps = demo ? Math.floor((now - born) / DEMO_PACE) : list[i]?.site?.steps ?? 0;
+      const steps = demo ? demoSteps(room, now - born) : list[i]?.site?.steps ?? 0;
       const next = Math.min(room.steps.length, steps);
       if (next === room.n) return;
       // A puff of dust where something new went up; none on the first sync after a reload.

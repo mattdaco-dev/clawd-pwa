@@ -33,9 +33,16 @@ const clients = new Set();
 // The steps done per directory are kept on disk, so a reload (or a later
 // session in the same project) picks the work up where it was. The site only
 // moves while a PWA watches it in that mode: a step per tool call, and at
-// least one every SITE_PACE.
+// least one now and then, at an uneven pace (sitePause).
 const SITE_FILE = join(dirname(fileURLToPath(import.meta.url)), 'data', 'site.json');
-const SITE_PACE = 15_000;
+// Between two steps without a tool call: mostly steady work, now and then a
+// rush of quick steps or a long break, drawn again after every step.
+function sitePause() {
+  const r = Math.random();
+  if (r < 0.25) return 3000 + Math.random() * 3000;
+  if (r < 0.85) return 9000 + Math.random() * 12_000;
+  return 30_000 + Math.random() * 25_000;
+}
 const SITE_MAX = 999;
 const RESCAN_EVERY = 30_000;
 // Counted apart: present or not, never walked into.
@@ -127,6 +134,7 @@ const siteWatched = () => [...clients].some((c) => c.site);
 
 function siteStep(s, now = Date.now()) {
   s.stepAt = now;
+  s.pause = sitePause();
   if (!s.dir || !s.plan || !siteWatched()) return false;
   const steps = siteSteps[s.dir] ?? 0;
   if (steps >= SITE_MAX) return false;
@@ -272,7 +280,7 @@ function apply(p) {
 
 function snapshot() {
   return {
-    sessions: [...sessions.values()].map(({ subagents, beforeCompact, plan, stepAt, scannedAt, ...s }) => ({
+    sessions: [...sessions.values()].map(({ subagents, beforeCompact, plan, stepAt, pause, scannedAt, ...s }) => ({
       ...s,
       site: plan ? { plan, steps: siteSteps[s.dir] ?? 0 } : null,
       subagents: [...subagents.values()],
@@ -304,9 +312,9 @@ setInterval(() => {
 setInterval(() => {
   const now = Date.now();
   let changed = false;
-  for (const s of sessions.values()) if (now - (s.stepAt ?? 0) >= SITE_PACE) changed = siteStep(s, now) || changed;
+  for (const s of sessions.values()) if (now - (s.stepAt ?? 0) >= (s.pause ?? 0)) changed = siteStep(s, now) || changed;
   if (changed) broadcast();
-}, 3000);
+}, 1000);
 
 async function serveStatic(pathname, res) {
   const file = normalize(join(PUBLIC, pathname === '/' ? 'index.html' : pathname));
