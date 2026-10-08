@@ -41,13 +41,13 @@ menu.addEventListener('click', (e) => {
   if (e.target.closest('a')) setMenu(false);
 });
 
-// The layout and the outside only mean something with furniture: greyed out without a decor.
+// Only the options that apply to the chosen decor are shown.
 function renderSettings() {
   for (const input of menu.querySelectorAll('.setting input')) {
     input.checked = String(settings[input.name]) === input.value;
   }
-  for (const set of menu.querySelectorAll('[data-needs-decor]')) set.disabled = settings.decor === 'none';
-  for (const set of menu.querySelectorAll('[data-needs-bare]')) set.disabled = settings.decor !== 'none';
+  for (const set of menu.querySelectorAll('[data-needs-decor]')) set.hidden = settings.decor === 'none';
+  for (const set of menu.querySelectorAll('[data-needs-bare]')) set.hidden = settings.decor !== 'none';
 }
 
 for (const input of menu.querySelectorAll('.setting input')) {
