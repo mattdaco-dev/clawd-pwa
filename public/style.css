@@ -382,8 +382,28 @@ body {
   color: var(--muted);
 }
 
-.agent-card .close {
+.agent-card .rename {
   margin-left: auto;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-card .name-field {
+  width: 16ch;
+  padding: 1px 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: inherit;
+  font: 600 13px system-ui, sans-serif;
+}
+
+.agent-card .close {
   padding: 0 4px;
   border: 0;
   background: none;

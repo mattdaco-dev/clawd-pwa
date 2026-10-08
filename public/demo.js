@@ -35,8 +35,13 @@ const SUB_SCRIPT = [
 export function createDemoModel() {
   let nextId = 0;
   const sessions = [];
+  const names = new Map(); // given from the card, by agent key
   const model = {
     sessions,
+    rename(key, name) {
+      if (name) names.set(key, name);
+      else names.delete(key);
+    },
     addSession() {
       if (sessions.length >= MAX_SESSIONS) return;
       const used = new Set(sessions.map((s) => s.name));
@@ -96,7 +101,8 @@ export function createDemoModel() {
               : { state: 'waiting', activity: 'bubble' };
             subs.push({ id: sub.id, type: sub.type, ...now, errorAt: sub.errorAt });
           }
-          return { id: s.id, name: s.name, state: main.state, activity: main.activity, errorAt: s.errorAt, subagents: subs };
+          for (const sub of subs) sub.name = names.get(`${s.id}/${sub.id}`) ?? null;
+          return { id: s.id, name: names.get(s.id) ?? s.name, state: main.state, activity: main.activity, errorAt: s.errorAt, subagents: subs };
         }),
       };
     },

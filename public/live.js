@@ -822,6 +822,7 @@ function cardHtml(c) {
   const row = (label, value) => rows.push(`<dt>${label}</dt><dd>${value}</dd>`);
   if (a.dir) row('Dossier', `<code>${esc(a.dir)}</code>`);
   if (a.kind === 'sub') row('Lancé par', esc(a.parentLabel));
+  if (a.kind === 'sub' && a.name) row('Type', esc(a.type));
   let state = STATE_LABELS[a.state] ?? esc(a.state);
   if (c.plan === SLEEP) state += ' (dort)';
   else if (c.onBreak) state += ' (pause café)';
@@ -834,6 +835,7 @@ function cardHtml(c) {
   if (a.lastError) row('Dernière erreur', `${a.lastError.tool ? `<code>${esc(a.lastError.tool)}</code> · ` : ''}il y a ${duration(now - a.lastError.at)}`);
   return `
     <header><strong>${esc(a.label)}</strong>${a.kind === 'sub' ? ' <small>subagent</small>' : ''}
+      <button type="button" class="rename" title="Renommer" aria-label="Renommer">✎</button>
       <button type="button" class="close" aria-label="Fermer">×</button></header>
     <dl>${rows.join('')}</dl>`;
 }
@@ -845,7 +847,7 @@ function agentsOf(snapshot) {
     const label = s.name || s.id.slice(0, 8);
     agents.push({ ...s, key: s.id, kind: 'main', label, zone });
     for (const sub of s.subagents) {
-      agents.push({ ...sub, key: `${s.id}/${sub.id}`, parent: s.id, parentLabel: label, kind: 'sub', label: sub.type, zone });
+      agents.push({ ...sub, key: `${s.id}/${sub.id}`, parent: s.id, parentLabel: label, kind: 'sub', label: sub.name || sub.type, zone });
     }
   });
   return agents;
@@ -883,6 +885,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
   const cat = new Cat();
   let shown = null; // the Clawd whose card is open
   let cardAt = 0; // when the card's text was last refreshed
+  let editing = false; // the name field is open: the card is not redrawn under it
 
   function resize() {
     width = stage.clientWidth;
@@ -1080,13 +1083,50 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     shown = critter;
     card.hidden = !critter;
     cardAt = 0;
+    editing = false;
+  }
+
+  // The name becomes a field: Enter or leaving it saves, Escape cancels, empty
+  // goes back to the default name.
+  function startRename() {
+    const strong = card.querySelector('header strong');
+    if (!shown || !strong) return;
+    editing = true;
+    const { key, label } = shown.info;
+    const input = document.createElement('input');
+    input.className = 'name-field';
+    input.value = label;
+    input.maxLength = 40;
+    input.setAttribute('aria-label', 'Nouveau nom');
+    strong.replaceWith(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      editing = false;
+      cardAt = 0;
+      const name = input.value.trim();
+      if (save && name !== label) {
+        if (demo) demo.rename(key, name);
+        else fetch('/rename', { method: 'POST', body: JSON.stringify({ key, name }) }).catch(() => {});
+        if (shown) shown.label = name || shown.label;
+      }
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') finish(true);
+      else if (e.key === 'Escape') finish(false);
+    });
+    input.addEventListener('blur', () => finish(true));
   }
 
   // Follows its Clawd; the text is refreshed twice a second.
   function updateCard(now) {
     if (!shown) return;
     if (shown.dead || shown.leaving || ![...critters.values()].includes(shown)) return openCard(null);
-    if (now - cardAt > 500) {
+    if (!editing && now - cardAt > 500) {
       cardAt = now;
       card.innerHTML = cardHtml(shown);
     }
@@ -1114,6 +1154,10 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
   });
   card.addEventListener('click', (e) => {
     if (e.target.closest('.close')) openCard(null);
+    else if (e.target.closest('.rename')) startRename();
+  });
+  card.addEventListener('dblclick', (e) => {
+    if (e.target.closest('header strong')) startRename();
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !root.hidden) openCard(null);

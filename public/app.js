@@ -108,7 +108,7 @@ let waitingBefore = null; // keys of the agents waiting at the last snapshot
 function showWaiting(snapshot) {
   const waiting = snapshot.sessions.flatMap((s) => [
     ...(s.state === 'waiting' ? [{ key: s.id, name: s.name || s.id.slice(0, 8), agent: s }] : []),
-    ...s.subagents.filter((a) => a.state === 'waiting').map((a) => ({ key: `${s.id}/${a.id}`, name: `${a.type} (${s.name})`, agent: a })),
+    ...s.subagents.filter((a) => a.state === 'waiting').map((a) => ({ key: `${s.id}/${a.id}`, name: `${a.name || a.type} (${s.name})`, agent: a })),
   ]);
   const n = waiting.length;
   const keys = new Set(waiting.map((w) => w.key));
