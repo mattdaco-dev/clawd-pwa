@@ -181,9 +181,13 @@ class Critter {
   }
 
   update(now, dt, agent, zone) {
-    const half = HALF_BODY * this.scale;
-    this.x = clamp(this.x, zone.x0 + half, zone.x1 - half);
-    this.y = clamp(this.y, zone.y0, zone.y1);
+    // Back from a game over the edge of its zone, it walks home rather than jump there.
+    if (!this.away) {
+      const bounds = this.duo?.area ?? zone;
+      const half = HALF_BODY * this.scale;
+      this.x = clamp(this.x, bounds.x0 + half, bounds.x1 - half);
+      this.y = clamp(this.y, bounds.y0, bounds.y1);
+    }
     if (this.leaving) {
       if (this.finished(now)) this.dead = true;
       return;
@@ -275,6 +279,7 @@ class Critter {
     if (this.slot) return this.walkTo(this.slot.spot(this.scale), zone);
     if (plan.wander) return this.walkTo(randomSpot(zone, this.scale), zone);
     if (plan.station) return this.walkTo(nearbySpot(this, zone), zone);
+    if (this.away) return this.walkTo(this, zone);
     this.perform();
   }
 
@@ -301,6 +306,7 @@ class Critter {
   }
 
   walkTo(spot, zone) {
+    this.away = false; // the target is inside `zone`
     const half = HALF_BODY * this.scale;
     this.target = { x: clamp(spot.x, zone.x0 + half, zone.x1 - half), y: clamp(spot.y, zone.y0, zone.y1) };
     const dist = Math.hypot(this.target.x - this.x, this.target.y - this.y);
@@ -363,6 +369,9 @@ class Duo {
     this.watchers = [];
     this.slots = slots;
     this.watchable = true;
+    // Without a decor, Clawds of two sessions may play together: the game
+    // spans both zones.
+    this.area = union(players[0].zone, players[1].zone);
     for (const c of players) c.release();
     for (const slot of slots) slot.occupant = this;
     const spots = this.spots(slots);
@@ -372,7 +381,7 @@ class Duo {
       c.plan = null;
       c.duo = this;
       c.duoDir = i === 0 ? 1 : -1;
-      c.walkTo(spots[i], c.zone);
+      c.walkTo(spots[i], this.area);
     });
   }
 
@@ -399,13 +408,15 @@ class Duo {
     c.watchSide = side;
     c.duoDir = -side;
     this.watchers.push(c);
-    c.walkTo({ x: outer.x + side * 28 * c.scale, y: outer.y + 6 * c.scale }, c.zone);
+    this.area = union(this.area, c.zone);
+    c.walkTo({ x: outer.x + side * 28 * c.scale, y: outer.y + 6 * c.scale }, this.area);
   }
 
   // Someone is called away: a watcher just leaves, a player ends the game.
   quit(c) {
     if (!c.watching) return this.end(false);
     this.watchers = this.watchers.filter((w) => w !== c);
+    c.away = c.zone !== this.area;
     c.duo = null;
     c.watching = false;
     c.target = null;
@@ -421,6 +432,7 @@ class Duo {
     for (const c of this.watchers) {
       // Only those who got there in time cheer; the others just go on.
       const arrived = !c.target;
+      c.away = c.zone !== this.area;
       c.duo = null;
       c.watching = false;
       c.target = null;
@@ -430,6 +442,7 @@ class Duo {
       else c.replan = true;
     }
     for (const c of this.players) {
+      c.away = c.zone !== this.area;
       c.duo = null;
       c.target = null;
       c.plan = null;
@@ -449,6 +462,19 @@ class Duo {
 
   // Drawn over the whole scene, night included, like the names.
   drawOver() {}
+}
+
+const union = (a, b) => (a === b ? a : {
+  x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1),
+});
+
+// Without a decor there is no rug nor radio: two Clawds meet halfway, on three
+// spots like a rug's, left to right.
+const MEET_GAP = 22; // sprite pixels from the middle to each end
+function meetingSpots([a, b]) {
+  const x = (a.x + b.x) / 2;
+  const y = (a.y + b.y) / 2;
+  return [-1, 0, 1].map((side) => ({ occupant: null, spot: (scale) => ({ x: x + side * MEET_GAP * scale, y }) }));
 }
 
 const between = ([lo, hi]) => lo + Math.floor(Math.random() * (hi - lo + 1));
@@ -822,6 +848,7 @@ function cardHtml(c) {
   const row = (label, value) => rows.push(`<dt>${label}</dt><dd>${value}</dd>`);
   if (a.dir) row('Dossier', `<code>${esc(a.dir)}</code>`);
   if (a.kind === 'sub') row('Lancé par', esc(a.parentLabel));
+  if (a.kind === 'sub' && a.name) row('Type', esc(a.type));
   let state = STATE_LABELS[a.state] ?? esc(a.state);
   if (c.plan === SLEEP) state += ' (dort)';
   else if (c.onBreak) state += ' (pause café)';
@@ -834,6 +861,7 @@ function cardHtml(c) {
   if (a.lastError) row('Dernière erreur', `${a.lastError.tool ? `<code>${esc(a.lastError.tool)}</code> · ` : ''}il y a ${duration(now - a.lastError.at)}`);
   return `
     <header><strong>${esc(a.label)}</strong>${a.kind === 'sub' ? ' <small>subagent</small>' : ''}
+      <button type="button" class="rename" title="Renommer" aria-label="Renommer">✎</button>
       <button type="button" class="close" aria-label="Fermer">×</button></header>
     <dl>${rows.join('')}</dl>`;
 }
@@ -845,7 +873,7 @@ function agentsOf(snapshot) {
     const label = s.name || s.id.slice(0, 8);
     agents.push({ ...s, key: s.id, kind: 'main', label, zone });
     for (const sub of s.subagents) {
-      agents.push({ ...sub, key: `${s.id}/${sub.id}`, parent: s.id, parentLabel: label, kind: 'sub', label: sub.type, zone });
+      agents.push({ ...sub, key: `${s.id}/${sub.id}`, parent: s.id, parentLabel: label, kind: 'sub', label: sub.name || sub.type, zone });
     }
   });
   return agents;
@@ -883,6 +911,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
   const cat = new Cat();
   let shown = null; // the Clawd whose card is open
   let cardAt = 0; // when the card's text was last refreshed
+  let editing = false; // the name field is open: the card is not redrawn under it
 
   function resize() {
     width = stage.clientWidth;
@@ -926,7 +955,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       const done = c;
       c.justDone = null;
       if (done.duo || done.leaving) continue;
-      const near = [...critters.values()].filter((o) => o !== done && o.zone === done.zone && available(o, now) &&
+      const near = [...critters.values()].filter((o) => o !== done && (office.bare || o.zone === done.zone) && available(o, now) &&
         Math.hypot(o.x - done.x, o.y - done.y) < FIVE_REACH * done.scale);
       if (!near.length) continue;
       const other = pick(near);
@@ -934,7 +963,25 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     }
   }
 
+  // Without a decor each session keeps to its own strip, rarely with two idle
+  // Clawds in it: any two of the scene meet halfway instead, the nearest more often.
+  function pairUpBare(now) {
+    if (now - (lastPairing.get(office) ?? 0) < PAIR_EVERY) return;
+    lastPairing.set(office, now);
+    if (Math.random() >= PAIR_CHANCE) return;
+    const free = [...critters.values()].filter((c) => available(c, now));
+    const game = duos.find((d) => d.started && d.watchable && d.watchers.length < 2);
+    if (game && free.length) return game.watch(pick(free));
+    if (free.length < 2) return;
+    const a = pick(free);
+    const others = free.filter((c) => c !== a).sort((p, q) => Math.abs(p.x - a.x) - Math.abs(q.x - a.x));
+    const b = pick(others.slice(0, 2));
+    const players = a.x <= b.x ? [a, b] : [b, a];
+    duos.push(new (pick([BallGame, SwordDuel, DanceDuo]))(players, meetingSpots(players)));
+  }
+
   function pairUp(now) {
+    if (office.bare) return pairUpBare(now);
     for (const zone of office.zones) {
       if (now - (lastPairing.get(zone) ?? 0) < PAIR_EVERY) continue;
       lastPairing.set(zone, now);
@@ -1080,13 +1127,50 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     shown = critter;
     card.hidden = !critter;
     cardAt = 0;
+    editing = false;
+  }
+
+  // The name becomes a field: Enter or leaving it saves, Escape cancels, empty
+  // goes back to the default name.
+  function startRename() {
+    const strong = card.querySelector('header strong');
+    if (!shown || !strong) return;
+    editing = true;
+    const { key, label } = shown.info;
+    const input = document.createElement('input');
+    input.className = 'name-field';
+    input.value = label;
+    input.maxLength = 40;
+    input.setAttribute('aria-label', 'Nouveau nom');
+    strong.replaceWith(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      editing = false;
+      cardAt = 0;
+      const name = input.value.trim();
+      if (save && name !== label) {
+        if (demo) demo.rename(key, name);
+        else fetch('/rename', { method: 'POST', body: JSON.stringify({ key, name }) }).catch(() => {});
+        if (shown) shown.label = name || shown.label;
+      }
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') finish(true);
+      else if (e.key === 'Escape') finish(false);
+    });
+    input.addEventListener('blur', () => finish(true));
   }
 
   // Follows its Clawd; the text is refreshed twice a second.
   function updateCard(now) {
     if (!shown) return;
     if (shown.dead || shown.leaving || ![...critters.values()].includes(shown)) return openCard(null);
-    if (now - cardAt > 500) {
+    if (!editing && now - cardAt > 500) {
       cardAt = now;
       card.innerHTML = cardHtml(shown);
     }
@@ -1114,6 +1198,10 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
   });
   card.addEventListener('click', (e) => {
     if (e.target.closest('.close')) openCard(null);
+    else if (e.target.closest('.rename')) startRename();
+  });
+  card.addEventListener('dblclick', (e) => {
+    if (e.target.closest('header strong')) startRename();
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !root.hidden) openCard(null);

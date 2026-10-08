@@ -4,3 +4,4 @@ node_modules/
 # sprites extraits du binaire local de Claude Code (assets Anthropic, non redistribués)
 vendor/
 logs/
+data/

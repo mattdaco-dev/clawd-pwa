@@ -1,12 +1,14 @@
 // Local hub: receives Claude Code hook payloads, keeps one state per agent and
 // streams snapshots to the PWA over server-sent events.
 import { createServer } from 'node:http';
-import { open, readFile } from 'node:fs/promises';
+import { mkdir, open, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PORT = Number(process.env.CLAWD_PORT ?? 4777);
-const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), 'public');
+const ROOT = dirname(fileURLToPath(import.meta.url));
+const PUBLIC = join(ROOT, 'public');
+const NAMES_FILE = join(ROOT, 'data', 'names.json');
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -28,6 +30,20 @@ const SUBAGENT_TTL = 30 * 60_000;
 
 const sessions = new Map();
 const clients = new Set();
+// Names given from the PWA, by agent key (session id, or session/agent id for a
+// subagent). Kept on disk so a resumed session keeps its name.
+let names = {};
+try {
+  names = JSON.parse(await readFile(NAMES_FILE, 'utf8'));
+} catch {}
+
+async function rename(key, name) {
+  const clean = String(name ?? '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  if (clean) names[key] = clean;
+  else delete names[key];
+  await mkdir(dirname(NAMES_FILE), { recursive: true });
+  await writeFile(NAMES_FILE, JSON.stringify(names, null, 2));
+}
 
 function activityFor(tool = '') {
   if (SEARCH_TOOLS.has(tool)) return 'search';
@@ -161,7 +177,11 @@ function apply(p) {
 
 function snapshot() {
   return {
-    sessions: [...sessions.values()].map(({ subagents, beforeCompact, ...s }) => ({ ...s, subagents: [...subagents.values()] })),
+    sessions: [...sessions.values()].map(({ subagents, beforeCompact, ...s }) => ({
+      ...s,
+      name: names[s.id] ?? s.name,
+      subagents: [...subagents.values()].map((a) => ({ ...a, name: names[`${s.id}/${a.id}`] ?? null })),
+    })),
   };
 }
 
@@ -207,6 +227,20 @@ createServer(async (req, res) => {
     for await (const chunk of req) body += chunk;
     try {
       apply(JSON.parse(body));
+    } catch {
+      return res.writeHead(400).end();
+    }
+    broadcast();
+    return res.writeHead(204).end();
+  }
+
+  if (req.method === 'POST' && pathname === '/rename') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const { key, name } = JSON.parse(body);
+      if (typeof key !== 'string' || !key) throw new Error();
+      await rename(key, name);
     } catch {
       return res.writeHead(400).end();
     }
