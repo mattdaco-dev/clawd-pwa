@@ -209,3 +209,8 @@ payloads contiennent tes prompts en clair.
 
 Projet de fan, non officiel et sans lien avec Anthropic. Clawd et Claude Code appartiennent à
 Anthropic ; les sprites de ce dépôt sont redessinés à la main en pixel art.
+
+## Licence
+
+Code sous licence [MIT](LICENSE). Elle couvre le code et les sprites redessinés de ce dépôt, pas le
+personnage de Clawd ni les marques d'Anthropic.
