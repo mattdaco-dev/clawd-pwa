@@ -93,7 +93,7 @@ Prérequis : macOS ou Linux, [Node.js](https://nodejs.org) 18 ou plus récent, `
 les scripts d'installation, et Chrome (ou un navigateur Chromium) pour la PWA. Aucune dépendance npm.
 
 ```sh
-git clone https://github.com/<toi>/clawd-pwa.git
+git clone https://github.com/mattdaco-dev/clawd-pwa.git
 cd clawd-pwa
 ```
 
