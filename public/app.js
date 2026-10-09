@@ -73,12 +73,20 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') setMenu(false);
 });
 
+const liveRoot = document.getElementById('live');
+const detachedNote = document.getElementById('detached');
+const detachButton = menu.querySelector('.detach');
+let pip = null; // the floating window holding the Live scene, while detached
+
 function route() {
   const current = location.hash.slice(2) in views ? location.hash.slice(2) : 'live';
   for (const [name, view] of Object.entries(views)) {
+    // Detached, the Live keeps running in its window whatever the app shows.
+    if (name === 'live' && pip) continue;
     if (name === current) view.show();
     else view.hide();
   }
+  detachedNote.hidden = !(pip && current === 'live');
   for (const link of menu.querySelectorAll('a')) {
     link.toggleAttribute('aria-current', link.dataset.view === current);
   }
@@ -86,6 +94,36 @@ function route() {
 
 window.addEventListener('hashchange', route);
 route();
+
+// Chrome keeps app windows wide; a Document Picture-in-Picture window can be
+// shrunk to a small square and stays on top.
+detachButton.hidden = !('documentPictureInPicture' in window);
+detachButton.addEventListener('click', async () => {
+  setMenu(false);
+  if (pip) return pip.focus();
+  try {
+    pip = await documentPictureInPicture.requestWindow({ width: 360, height: 360 });
+  } catch {
+    return;
+  }
+  for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
+    pip.document.head.append(link.cloneNode());
+  }
+  if (document.documentElement.dataset.theme) pip.document.documentElement.dataset.theme = document.documentElement.dataset.theme;
+  pip.document.title = 'Clawd';
+  pip.document.body.classList.add('pip');
+  pip.document.body.append(liveRoot);
+  live.rehome();
+  live.show();
+  pip.addEventListener('pagehide', () => {
+    pip = null;
+    detachedNote.after(liveRoot);
+    live.rehome();
+    route();
+  });
+  route();
+});
+detachedNote.querySelector('.reattach').addEventListener('click', () => pip?.close());
 
 const events = new EventSource('/events');
 events.onopen = () => live.setConnected(true);

@@ -21,6 +21,7 @@
       <a href="#/" data-view="live">Live</a>
       <a href="#/demo" data-view="demo">Démo</a>
       <a href="#/galerie" data-view="galerie">Galerie</a>
+      <button type="button" class="detach" hidden>Détacher le Live</button>
       <fieldset class="setting">
         <legend>Décor</legend>
         <label><input type="radio" name="decor" value="none"> Aucun</label>
@@ -64,6 +65,10 @@
   </div>
 
   <section id="live" class="scene" hidden></section>
+  <section id="detached" class="scene detached" hidden>
+    <p>Le Live est dans une fenêtre flottante.</p>
+    <button type="button" class="reattach">Le remettre ici</button>
+  </section>
   <section id="demo" class="scene" hidden></section>
   <section id="gallery" hidden>
     <p class="intro">Toutes les animations, regroupées par activité de l'agent. À gauche le Clawd du main, à droite celui d'un subagent.</p>
