@@ -1101,7 +1101,19 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     }
 
     updateCard(now);
-    raf = requestAnimationFrame(tick);
+    schedule();
+  }
+
+  // Frames come from the window the scene lives in: the app's, or the floating
+  // one once it is detached (the app's own frames stall when it is hidden).
+  let frameWin = window;
+  function schedule() {
+    frameWin = root.ownerDocument.defaultView ?? window;
+    raf = frameWin.requestAnimationFrame(tick);
+  }
+  function unschedule() {
+    frameWin.cancelAnimationFrame(raf);
+    raf = 0;
   }
 
   // The Clawd under the pointer, if any: its body, or loosely around it and its name
@@ -1217,13 +1229,27 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
       resize();
       renderStatus();
       last = performance.now();
-      if (!raf) raf = requestAnimationFrame(tick);
+      if (!raf) schedule();
     },
     hide() {
       root.hidden = true;
       openCard(null);
-      cancelAnimationFrame(raf);
-      raf = 0;
+      unschedule();
+    },
+    // The scene was moved to another window: follow its frames and its size.
+    rehome() {
+      const win = root.ownerDocument.defaultView;
+      if (raf) {
+        unschedule();
+        schedule();
+      }
+      if (win && win !== window) {
+        win.addEventListener('resize', resize);
+        win.document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') openCard(null);
+        });
+      }
+      resize();
     },
     setSnapshot(next) {
       snapshot = next;
