@@ -1,7 +1,7 @@
 {
   "name": "Clawd",
   "short_name": "Clawd",
-  "description": "Un Clawd par agent Claude Code",
+  "description": "A Clawd for each Claude Code agent",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f0eee6",

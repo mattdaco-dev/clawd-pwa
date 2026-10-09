@@ -17,9 +17,9 @@ const MAX_TRIP = 3; // seconds; long trips walk faster
 const SLEEP_AFTER = 120_000;
 const SLEEP_AFTER_NIGHT = 30_000; // once night has mostly fallen, by the real sunset
 
-// The scene's clock: local time, or a fixed hour from `?heure=22` (or the demo
+// The scene's clock: local time, or a fixed hour from `?hour=22` (or the demo
 // bar) to try the night. Fractions of an hour are minutes: 19.5 is 19:30.
-const urlHour = new URLSearchParams(location.search).get('heure');
+const urlHour = new URLSearchParams(location.search).get('hour');
 const forcedHour = urlHour !== null && Number.isFinite(Number(urlHour)) ? Number(urlHour) : null;
 function sceneDate(hour = forcedHour) {
   const date = new Date();
@@ -821,15 +821,15 @@ function nearbySpot(critter, zone) {
 }
 
 // The card shown when a Clawd is clicked.
-const STATE_LABELS = { working: 'Travaille', waiting: 'Attend un input', idle: 'Au repos' };
+const STATE_LABELS = { working: 'Working', waiting: 'Waiting for input', idle: 'Idle' };
 const ACTIVITY_LABELS = {
-  type: 'écrit',
-  search: 'lit, cherche',
-  web: 'sur le web',
-  think: 'réfléchit',
-  compact: 'compacte le contexte',
-  flag: 'demande une permission',
-  bubble: 'attend une réponse',
+  type: 'writing',
+  search: 'reading, searching',
+  web: 'on the web',
+  think: 'thinking',
+  compact: 'compacting the context',
+  flag: 'asking for permission',
+  bubble: 'waiting for an answer',
 };
 const esc = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -846,23 +846,23 @@ function cardHtml(c) {
   const now = Date.now();
   const rows = [];
   const row = (label, value) => rows.push(`<dt>${label}</dt><dd>${value}</dd>`);
-  if (a.dir) row('Dossier', `<code>${esc(a.dir)}</code>`);
-  if (a.kind === 'sub') row('Lancé par', esc(a.parentLabel));
+  if (a.dir) row('Folder', `<code>${esc(a.dir)}</code>`);
+  if (a.kind === 'sub') row('Started by', esc(a.parentLabel));
   if (a.kind === 'sub' && a.name) row('Type', esc(a.type));
   let state = STATE_LABELS[a.state] ?? esc(a.state);
-  if (c.plan === SLEEP) state += ' (dort)';
-  else if (c.onBreak) state += ' (pause café)';
-  row('État', state);
+  if (c.plan === SLEEP) state += ' (asleep)';
+  else if (c.onBreak) state += ' (coffee break)';
+  row('State', state);
   const doing = [ACTIVITY_LABELS[a.activity], a.tool && `<code>${esc(a.tool)}</code>`].filter(Boolean).join(' · ');
-  if (a.state !== 'idle' && doing) row('En cours', doing);
-  if (c.stateSince) row('Depuis', duration(now - c.stateSince));
-  if (a.startedAt) row(a.kind === 'sub' ? 'Lancé il y a' : 'Session ouverte', duration(now - a.startedAt));
+  if (a.state !== 'idle' && doing) row('Doing', doing);
+  if (c.stateSince) row('For', duration(now - c.stateSince));
+  if (a.startedAt) row(a.kind === 'sub' ? 'Running for' : 'Session open for', duration(now - a.startedAt));
   if (a.subagents?.length) row('Subagents', a.subagents.map((sub) => esc(sub.type)).join(', '));
-  if (a.lastError) row('Dernière erreur', `${a.lastError.tool ? `<code>${esc(a.lastError.tool)}</code> · ` : ''}il y a ${duration(now - a.lastError.at)}`);
+  if (a.lastError) row('Last error', `${a.lastError.tool ? `<code>${esc(a.lastError.tool)}</code> · ` : ''}${duration(now - a.lastError.at)} ago`);
   return `
     <header><strong>${esc(a.label)}</strong>${a.kind === 'sub' ? ' <small>subagent</small>' : ''}
-      <button type="button" class="rename" title="Renommer" aria-label="Renommer">✎</button>
-      <button type="button" class="close" aria-label="Fermer">×</button></header>
+      <button type="button" class="rename" title="Rename" aria-label="Rename">✎</button>
+      <button type="button" class="close" aria-label="Close">×</button></header>
     <dl>${rows.join('')}</dl>`;
 }
 
@@ -884,7 +884,7 @@ function agentsOf(snapshot) {
 export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = {}) {
   root.innerHTML = `
     <div class="stage"><canvas></canvas><div class="agent-card" role="dialog" hidden></div></div>
-    <div class="live-bar"><span class="status" data-state="off">hors ligne</span></div>`;
+    <div class="live-bar"><span class="status" data-state="off">offline</span></div>`;
   const stage = root.querySelector('.stage');
   const canvas = root.querySelector('canvas');
   const status = root.querySelector('.status');
@@ -926,7 +926,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     }
     const n = snapshot.sessions.length;
     status.dataset.state = connected ? 'on' : 'off';
-    status.textContent = connected ? `connecté · ${n} session${n > 1 ? 's' : ''}` : 'hors ligne';
+    status.textContent = connected ? `connected · ${n} session${n > 1 ? 's' : ''}` : 'offline';
   }
 
   // Rebuilds the decor when the window, the settings or the list of sessions change.
@@ -1097,7 +1097,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     if (critters.size === 0) {
       ctx.fillStyle = '#8f8b82';
       ctx.font = '14px system-ui, sans-serif';
-      ctx.fillText('Aucune session Claude Code active', width / 2, viewHeight / 2);
+      ctx.fillText('No active Claude Code session', width / 2, viewHeight / 2);
     }
 
     updateCard(now);
@@ -1153,7 +1153,7 @@ export function createLive(root, { demo = null, settings = DEFAULT_SETTINGS } = 
     input.className = 'name-field';
     input.value = label;
     input.maxLength = 40;
-    input.setAttribute('aria-label', 'Nouveau nom');
+    input.setAttribute('aria-label', 'New name');
     strong.replaceWith(input);
     input.focus();
     input.select();

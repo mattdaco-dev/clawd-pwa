@@ -5,15 +5,15 @@ import { sunTimes } from './sun.js';
 // every mode of the scene. Sessions follow a looping script unless one is
 // pinned to a state from the bar.
 
-const NAMES = ['démo', 'api', 'web', 'docs', 'infra', 'mobile', 'data', 'design', 'ops', 'auth', 'billing', 'search'];
+const NAMES = ['demo', 'api', 'web', 'docs', 'infra', 'mobile', 'data', 'design', 'ops', 'auth', 'billing', 'search'];
 const SUB_TYPES = ['Explore', 'general-purpose', 'Plan', 'code-reviewer', 'test-engineer', 'security-auditor'];
 const MAX_SESSIONS = 12;
 const MAX_SUBS = 4;
 const STEP = 8; // seconds per step of the script
 
-const ACTIVITIES = { type: 'Clavier', search: 'Recherche', web: 'Web', think: 'Réflexion', compact: 'Compaction' };
-const MAIN_STATES = { auto: 'Scénario', working: 'Travaille', waiting: 'Attend', idle: 'Repos' };
-const SUB_STATES = { auto: 'Scénario', working: 'Travaille', waiting: 'Attend' };
+const ACTIVITIES = { type: 'Keyboard', search: 'Search', web: 'Web', think: 'Thinking', compact: 'Compaction' };
+const MAIN_STATES = { auto: 'Script', working: 'Working', waiting: 'Waiting', idle: 'Idle' };
+const SUB_STATES = { auto: 'Script', working: 'Working', waiting: 'Waiting' };
 
 const scripted = (id, type, state, activity) => ({ id, type, state, activity });
 const MAIN_SCRIPT = [
@@ -45,7 +45,7 @@ export function createDemoModel() {
     addSession() {
       if (sessions.length >= MAX_SESSIONS) return;
       const used = new Set(sessions.map((s) => s.name));
-      const name = NAMES.find((n) => !used.has(n)) ?? `salle-${nextId}`;
+      const name = NAMES.find((n) => !used.has(n)) ?? `room-${nextId}`;
       sessions.push({ id: `d${nextId++}`, name, mode: 'auto', activity: 'type', offset: (sessions.length * 3) % MAIN_SCRIPT.length, subs: [], errorAt: null });
     },
     removeSession(session) {
@@ -109,14 +109,14 @@ export function createDemoModel() {
     describe() {
       const n = sessions.length;
       const subs = sessions.reduce((sum, s) => sum + s.subs.length, 0);
-      return `démo · ${n} session${n > 1 ? 's' : ''}${subs ? ` · ${subs} sous-agent${subs > 1 ? 's' : ''} ajouté${subs > 1 ? 's' : ''}` : ''}`;
+      return `demo · ${n} session${n > 1 ? 's' : ''}${subs ? ` · ${subs} subagent${subs > 1 ? 's' : ''} added` : ''}`;
     },
   };
   model.reset();
   return model;
 }
 
-const HOURS = [['auto', 'Maintenant'], ['sunrise', 'Lever'], ['noon', 'Jour'], ['sunset', 'Coucher'], ['night', 'Nuit']];
+const HOURS = [['auto', 'Now'], ['sunrise', 'Sunrise'], ['noon', 'Day'], ['sunset', 'Sunset'], ['night', 'Night']];
 // Today's hour for each moment, from the real sunrise and sunset.
 function hourOf(moment) {
   const { sunrise, sunset } = sunTimes(new Date());
@@ -125,15 +125,15 @@ function hourOf(moment) {
   if (moment === 'noon') return (sunrise + sunset) / 2;
   return (sunset + 3) % 24; // well into the night
 }
-const clock = (h) => `${Math.floor(h)}h${String(Math.round((h % 1) * 60) % 60).padStart(2, '0')}`;
-const WEATHERS = { auto: 'Réelle', clear: 'Soleil', cloudy: 'Nuages', fog: 'Brouillard', rain: 'Pluie', snow: 'Neige', storm: 'Orage' };
+const clock = (h) => `${Math.floor(h)}:${String(Math.round((h % 1) * 60) % 60).padStart(2, '0')}`;
+const WEATHERS = { auto: 'Real', clear: 'Sun', cloudy: 'Clouds', fog: 'Fog', rain: 'Rain', snow: 'Snow', storm: 'Storm' };
 const SEASONS = {
-  auto: 'Du moment', none: 'Aucune',
-  'nouvel-an': 'Nouvel An', fuesend: 'Fuesend', buergbrennen: 'Buergbrennen', paques: 'Pâques',
-  'fete-lu': 'Fête nationale (LU)', 'fete-fr': '14 juillet (FR)', 'fete-be': 'Fête nationale (BE)',
-  fouer: 'Schueberfouer', 'fete-de': 'Tag der Deutschen Einheit (DE)', halloween: 'Halloween',
-  kleeschen: 'Kleeschen', noel: 'Noël',
-  printemps: 'Printemps', ete: 'Été', automne: 'Automne', hiver: 'Hiver',
+  auto: 'Current', none: 'None',
+  'nouvel-an': 'New Year', fuesend: 'Fuesend', buergbrennen: 'Buergbrennen', paques: 'Easter',
+  'fete-lu': 'National Day (LU)', 'fete-fr': 'Bastille Day (FR)', 'fete-be': 'National Day (BE)',
+  fouer: 'Schueberfouer', 'fete-de': 'German Unity Day (DE)', halloween: 'Halloween',
+  kleeschen: 'Kleeschen', noel: 'Christmas',
+  printemps: 'Spring', ete: 'Summer', automne: 'Autumn', hiver: 'Winter',
 };
 
 const options = (map, current) => Object.entries(map)
@@ -167,19 +167,19 @@ export function createDemoBar(root, model, scene, settings) {
       </fieldset>`;
     return `
       <div class="demo-row">
-        <span class="demo-label">Décor</span>${seg('decor', Object.fromEntries(Object.entries(DECORS).map(([k, d]) => [k, d.label])), current.decor)}
-        <span class="demo-label">Bureau</span>${seg('desk', { off: 'Non', on: 'Oui' }, current.desk, current.decor !== 'none')}
-        <span class="demo-label">Disposition</span>${seg('layout', LAYOUTS, current.layout, current.decor === 'none')}
-        <label class="demo-label">Extérieur <select data-setting="outside"${current.decor === 'none' ? ' disabled' : ''}>${options(OUTSIDES, current.outside)}</select></label>
+        <span class="demo-label">Backdrop</span>${seg('decor', Object.fromEntries(Object.entries(DECORS).map(([k, d]) => [k, d.label])), current.decor)}
+        <span class="demo-label">Desk</span>${seg('desk', { off: 'No', on: 'Yes' }, current.desk, current.decor !== 'none')}
+        <span class="demo-label">Layout</span>${seg('layout', LAYOUTS, current.layout, current.decor === 'none')}
+        <label class="demo-label">Outside <select data-setting="outside"${current.decor === 'none' ? ' disabled' : ''}>${options(OUTSIDES, current.outside)}</select></label>
         <span class="demo-label">Pixels</span>${seg('px', Object.fromEntries(PIXEL_SIZES.map((n) => [n, n])), current.px)}
-        <button type="button" data-act="randomize" title="Décor, disposition, extérieur, heure, météo, saison et sessions au hasard ; la taille des pixels ne change pas">Tout au hasard</button>
-        <button type="button" data-act="reset" title="Réglages du menu et les trois sessions du scénario">Réinitialiser</button>
-        <button type="button" data-act="reseed"${current.decor === 'none' ? ' disabled' : ''}>Régénérer le décor</button>
+        <button type="button" data-act="randomize" title="Random backdrop, layout, outside, time, weather, season and sessions; the pixel size stays">Randomize all</button>
+        <button type="button" data-act="reset" title="Menu settings and the three scripted sessions">Reset</button>
+        <button type="button" data-act="reseed"${current.decor === 'none' ? ' disabled' : ''}>Regenerate backdrop</button>
       </div>
       <div class="demo-row">
-        <span class="demo-label">Heure</span>${seg('hour', HOURS.map(([v, label]) => [v, v === 'auto' ? label : `${label} ${clock(hourOf(v))}`]), view.hour)}
-        <label class="demo-label">Météo <select data-view="weather">${options(WEATHERS, view.weather)}</select></label>
-        <label class="demo-label">Saison <select data-view="season">${options(SEASONS, view.season)}</select></label>
+        <span class="demo-label">Time</span>${seg('hour', HOURS.map(([v, label]) => [v, v === 'auto' ? label : `${label} ${clock(hourOf(v))}`]), view.hour)}
+        <label class="demo-label">Weather <select data-view="weather">${options(WEATHERS, view.weather)}</select></label>
+        <label class="demo-label">Season <select data-view="season">${options(SEASONS, view.season)}</select></label>
       </div>`;
   }
 
@@ -191,16 +191,16 @@ export function createDemoBar(root, model, scene, settings) {
           <strong>${s.name}</strong>
           <select data-field="mode">${options(MAIN_STATES, s.mode)}</select>
           ${s.mode === 'working' ? activity(s.activity, 'data-field="activity"') : ''}
-          <button type="button" data-act="error" title="Un outil échoue">Erreur</button>
-          <button type="button" data-act="add-sub"${s.subs.length >= MAX_SUBS ? ' disabled' : ''}>+ sous-agent</button>
-          <button type="button" data-act="remove" title="Fermer la session" aria-label="Fermer ${s.name}">×</button>
+          <button type="button" data-act="error" title="A tool fails">Error</button>
+          <button type="button" data-act="add-sub"${s.subs.length >= MAX_SUBS ? ' disabled' : ''}>+ subagent</button>
+          <button type="button" data-act="remove" title="Close the session" aria-label="Close ${s.name}">×</button>
           ${s.subs.map((sub, k) => `
             <span class="demo-sub" data-sub="${k}">
               ${sub.type}
               <select data-field="mode">${options(SUB_STATES, sub.mode)}</select>
               ${sub.mode === 'working' ? activity(sub.activity, 'data-field="activity"') : ''}
-              <button type="button" data-act="error" title="Un outil échoue">!</button>
-              <button type="button" data-act="remove" title="Terminer le sous-agent" aria-label="Terminer ${sub.type}">×</button>
+              <button type="button" data-act="error" title="A tool fails">!</button>
+              <button type="button" data-act="remove" title="End the subagent" aria-label="End ${sub.type}">×</button>
             </span>`).join('')}
         </div>`).join('')}
         <button type="button" data-act="add-session"${model.sessions.length >= MAX_SESSIONS ? ' disabled' : ''}>+ Clawd</button>

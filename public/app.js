@@ -25,7 +25,7 @@ const demoBar = createDemoBar(document.getElementById('demo'), demoModel, demo, 
 const views = {
   live,
   demo,
-  galerie: createGallery(document.getElementById('gallery')),
+  gallery: createGallery(document.getElementById('gallery')),
 };
 
 const menuButton = document.querySelector('.menu-button');
@@ -52,7 +52,7 @@ function renderSettings() {
 
 for (const input of menu.querySelectorAll('.setting input')) {
   input.addEventListener('change', async () => {
-    // The browser asks once; refused, the setting falls back to « Non ».
+    // The browser asks once; refused, the setting falls back to "No".
     if (input.name === 'notify' && input.value === 'on' && Notification.permission !== 'granted') {
       if ((await Notification.requestPermission()) !== 'granted') return renderSettings();
     }
@@ -135,8 +135,8 @@ events.onmessage = (e) => {
 };
 
 const WAIT_REASONS = {
-  AskUserQuestion: 'a une question',
-  ExitPlanMode: 'a un plan à valider',
+  AskUserQuestion: 'has a question',
+  ExitPlanMode: 'has a plan to approve',
 };
 let waitingBefore = null; // keys of the agents waiting at the last snapshot
 
@@ -166,10 +166,10 @@ function showWaiting(snapshot) {
 async function notify({ key, name, agent }) {
   if (settings.notify !== 'on' || Notification.permission !== 'granted') return;
   if (document.visibilityState === 'visible' && document.hasFocus()) return;
-  const reason = WAIT_REASONS[agent.tool] ?? (agent.tool ? `demande à utiliser ${agent.tool}` : 'attend ta réponse');
+  const reason = WAIT_REASONS[agent.tool] ?? (agent.tool ? `wants to use ${agent.tool}` : 'is waiting for you');
   try {
     const registration = await navigator.serviceWorker.ready;
-    await registration.showNotification(`${name} ${reason}`, { tag: key, icon: '/icons/icon-192.png', body: 'Claude Code attend un input.' });
+    await registration.showNotification(`${name} ${reason}`, { tag: key, icon: '/icons/icon-192.png', body: 'Claude Code is waiting for input.' });
   } catch {}
 }
 

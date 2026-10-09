@@ -5,9 +5,9 @@
 import { bareDesk, buildOffice } from './office.js';
 import { WORLDS } from './outdoors.js';
 
-export const LAYOUTS = { rooms: 'Salles', shared: 'Open space partagé' };
+export const LAYOUTS = { rooms: 'Rooms', shared: 'Shared open space' };
 export const PIXEL_SIZES = [1, 2, 3, 4, 5, 6];
-export const OUTSIDES = { random: 'Au hasard', none: 'Aucun', ...WORLDS };
+export const OUTSIDES = { random: 'Random', none: 'None', ...WORLDS };
 export const DEFAULT_SETTINGS = { decor: 'open-space', layout: 'rooms', px: 4, notify: 'off', outside: 'random', desk: 'off' };
 
 // No furniture: an empty floor split in columns, no stations, Clawds wander anywhere.
@@ -46,6 +46,6 @@ function buildBare(width, height, names, { px, desk = 'off', salt = '' }) {
 }
 
 export const DECORS = {
-  none: { label: 'Aucun', build: buildBare },
-  'open-space': { label: 'Open space', build: buildOffice },
+  none: { label: 'None', build: buildBare },
+  'open-space': { label: 'Office', build: buildOffice },
 };

@@ -4,7 +4,7 @@ const CACHE = 'clawd-v1';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
-// A click on « X attend » brings the PWA back to the front.
+// A click on "X is waiting" brings the PWA back to the front.
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   e.waitUntil(

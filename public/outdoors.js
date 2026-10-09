@@ -5,7 +5,7 @@
 import { INK, drawSprite, sprite } from './pixels.js';
 import { flicker } from './seasons.js';
 
-export const WORLDS = { ville: 'Ville', village: 'Village', campagne: 'Campagne', mer: 'Bord de mer', espace: 'Vaisseau spatial' };
+export const WORLDS = { ville: 'City', village: 'Village', campagne: 'Countryside', mer: 'Seaside', espace: 'Spaceship' };
 
 // One world a day when the setting is « Au hasard »; the salt gives another.
 export function worldOfDay(date, salt = '') {
