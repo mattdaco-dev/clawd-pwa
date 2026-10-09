@@ -18,8 +18,9 @@ OTHER_EVENTS = [
 ]
 
 
+# By file name, so a hook left behind by a moved clone is replaced too.
 def is_ours(group):
-    return any(h.get("command") == HOOK for h in group.get("hooks", []))
+    return any(h.get("command", "").endswith("/hooks/clawd-hook.sh") for h in group.get("hooks", []))
 
 
 def main():
