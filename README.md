@@ -1,122 +1,211 @@
 # clawd-pwa
 
-PWA locale qui affiche un Clawd par agent Claude Code :
+Un petit bureau en pixel art où chaque agent Claude Code est représenté par un Clawd, la mascotte
+de Claude Code. Le Clawd tape au clavier quand son agent travaille, lève un drapeau quand il attend
+ta réponse, et se balade, joue ou fait la sieste quand il n'a rien à faire.
 
-- le Clawd du main, taille et couleur d'origine ;
-- un Clawd plus petit et plus clair par subagent.
+<p align="center">
+  <img src="docs/aucun-decor.png" width="512" height="512" alt="Trois Clawd tapent au clavier à leur bureau ; deux subagents plus petits et plus clairs attendent une réponse, l'un en agitant un drapeau à damier, l'autre sous un point d'exclamation">
+</p>
 
-Chaque Clawd reflète l'état de son agent : il tape au clavier quand il travaille, agite un drapeau
-quand il attend un input, se balade et joue quand il n'a rien à faire.
+Ci-dessus, la version la plus simple : un bureau par session (`démo`, `api`, `web`). Les trois
+agents principaux travaillent ; les petits Clawd plus clairs sont des subagents qui attendent une
+réponse, l'un avec son drapeau, l'autre avec sa bulle.
 
-Les états viennent des hooks de Claude Code, envoyés à un petit serveur local qui les diffuse en SSE.
+Tout tourne en local : un hook Claude Code, un mini serveur Node sans dépendance et une PWA à
+installer depuis Chrome. Le hook ne ralentit pas tes prompts et ne coûte aucun token (détails plus
+bas).
 
-## Lancer
+## Ce que tu vois
 
-```sh
-python3 scripts/install-service.py   # serveur en agent launchd : démarre au login, relancé s'il tombe
-python3 scripts/install-hooks.py     # branche le hook dans ~/.claude/settings.json (sauvegarde avant écriture)
+- **Un Clawd par session** Claude Code ouverte, nommé d'après le dossier de lancement (renommable
+  depuis sa fiche). Les subagents apparaissent comme des Clawd plus petits et plus clairs, à côté de
+  leur agent principal.
+- **L'activité réelle de l'agent** : il tape au clavier pour une édition ou une commande, consulte
+  la bibliothèque pour une lecture ou une recherche, le globe pour le web, le tableau blanc quand il
+  réfléchit ou planifie. Il agite un drapeau quand il attend une permission ou une réponse, sursaute
+  sous une croix rouge quand un outil échoue, fête un commit et réagit aux tests verts ou rouges.
+  Pendant une compaction du contexte, il passe ses notes à la broyeuse.
+- **La vie de bureau entre deux tâches** : café au comptoir (et discussion à deux), passe de ballon,
+  duel à l'épée, danse devant la radio, sieste sur un pouf, high five quand un collègue termine. Un
+  chat se promène, dort sur les bibliothèques et vient tenir compagnie à celui qui attend.
+- **Un décor vivant** : salles en plan d'étage ou open space partagé, extérieur (ville, village,
+  campagne, bord de mer ou vaisseau spatial), vraies heures de lever et de coucher du soleil, météo
+  du moment aux fenêtres, saisons et fêtes (Halloween, Noël, Pâques, fêtes nationales, plus
+  quelques traditions luxembourgeoises comme la Schueberfouer ou le Buergbrennen), avec décorations
+  et déguisements.
+- **Ce qui t'attend** : le titre de l'onglet et le badge de l'icône comptent les agents qui
+  attendent un input. En option, une notification système quand un agent se met à attendre et que
+  la PWA n'est pas au premier plan.
+
+Et à partir de là, beaucoup de choses se personnalisent : décor complet, extérieur, taille des
+pixels, saison… (voir [Utilisation](#utilisation)).
+
+![Le bureau complet en automne : deux salles décorées pour Halloween dans un village, un Clawd déguisé en fantôme prend un café](docs/decor.png)
+
+Un clic sur un Clawd ouvre sa fiche : dossier, état, outil en cours, depuis quand, subagents,
+dernière erreur.
+
+## Comment ça marche
+
+```
+Claude Code ──hook──> hooks/clawd-hook.sh ──POST /event──> server.js ──SSE──> PWA (canvas)
+                       (en arrière-plan)                    127.0.0.1:4777
 ```
 
-Les deux scripts acceptent `--uninstall`. Pour lancer le serveur à la main à la place : `npm start`.
+1. Claude Code déclenche des [hooks](https://docs.claude.com/en/docs/claude-code/hooks) à chaque
+   étape d'une session : `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`,
+   `PostToolUseFailure`, `PermissionRequest`, `Notification`, `Stop`, `SubagentStart`,
+   `SubagentStop`, `PreCompact`, `PostCompact`, `SessionEnd`.
+2. `hooks/clawd-hook.sh` reçoit le payload JSON de l'événement sur son entrée standard et l'envoie
+   au serveur local avec `curl`.
+3. `server.js` traduit ces événements en un état par agent (`working`, `waiting`, `idle`, avec
+   l'activité et l'outil en cours) et diffuse un instantané à la PWA en Server-Sent Events.
+4. La PWA dessine la scène sur un canvas. Tous les sprites sont des grilles de pixels dessinées dans
+   le code (`public/sprites.js`), aucune image n'est chargée.
 
-Le service écrit le chemin absolu de `node` dans le plist (launchd ne voit pas nvm) : relancer
-`install-service.py` après un changement de version de Node. Journal du serveur : `logs/server.log`.
+### Pas de ralentissement
 
-Ouvrir http://localhost:4777 dans Chrome, puis « Installer l'application » pour en faire une PWA.
-Le bouton rond en haut à gauche ouvre le menu : Live (les vraies sessions), Démo (des sessions
-inventées, sans Claude Code) et Galerie (toutes les animations regroupées par activité). La Démo a
-sa propre barre de réglages : décor, disposition, taille des pixels, heure, météo, saison, un
-bouton pour régénérer le décor, et la liste des sessions. On y ajoute ou ferme des Clawd et des
-sous-agents, on les laisse suivre le scénario en boucle ou on force leur état et leur activité, et
-on déclenche une erreur d'outil. « Tout au hasard » tire une configuration complète (sauf la taille des pixels), « Réinitialiser »
-revient aux réglages du menu et aux trois sessions du scénario. Le même menu
-porte les réglages, gardés dans le navigateur :
+Le hook est déclaré `async` dans `settings.json` : Claude Code le lance et continue sans attendre
+sa fin. Le script lui-même rend la main en une dizaine de millisecondes, parce que l'envoi au
+serveur part en arrière-plan avec ses flux fermés et un délai maximal d'une seconde. Si le serveur
+est arrêté, lent ou absent, rien ne change côté Claude Code : `curl` échoue en silence et le hook
+sort toujours avec le code 0.
 
-- Décor : aucun ou open space (la plage viendra ensuite).
-- Disposition, avec un décor : « Salles » (une pièce par session, la page défile quand il y en a
-  trop) ou « Open space partagé » (un seul bureau, tout le monde partage les postes). Les salles
-  forment le plan d'un étage : murs partagés, tailles un peu différentes, bords irréguliers,
-  couloirs sous certaines salles (parfois derrière une baie vitrée), passages de tailles variées
-  entre voisines et entrée du bâtiment en bas. Les Clawd restent dans leur salle.
-- Taille des pixels : de 1 à 6 px, décor compris. Les subagents ont un pixel de moins (à 1 px, la
-  même taille).
+### Pas de tokens en plus
 
-L'open space suit les vraies heures de lever et de coucher du soleil à Luxembourg, calculées pour le
-jour (`public/sun.js`) : lumière rosée au lever, ciel orangé au coucher, nuit étoilée dans les
-fenêtres et lampes allumées la nuit. La nuit, un Clawd qui travaille allume sa lumière : lampe de
-bureau ou rétroéclairage de l'écran selon le bureau, lampe sur pied près de la bibliothèque et du
-tableau blanc. Elle s'éteint quand il s'en va. Une fois la nuit tombée, les Clawd au repos
-s'endorment au bout de 30 s au lieu de 2 minutes. Pour voir la nuit en plein jour, ouvrir
-`/?heure=22` ; la Démo a des boutons Lever, Jour, Coucher et Nuit réglés sur les heures du jour.
+Les tokens viennent de ce que le modèle lit. Or un hook n'ajoute rien au contexte tant qu'il
+n'écrit rien sur sa sortie standard, et celui-ci n'écrit rien : sortie vide, code 0. Le modèle ne
+sait même pas que la PWA existe. Le serveur et la PWA n'appellent aucune API de Claude, ils se
+contentent d'afficher ce que les hooks leur transmettent.
 
-Les fenêtres montrent la météo du moment à Luxembourg (Open-Meteo, sans clé, rafraîchie toutes les
-30 min) : nuages, brouillard, pluie, neige, orage avec éclairs. Pour en forcer une :
-`/?meteo=pluie` (ou `soleil`, `nuages`, `brouillard`, `neige`, `orage`). Coordonnées dans
-`public/weather.js`. En octobre, Halloween : guirlande de fanions et de chauves-souris, toiles
-d'araignée, fantôme suspendu, chaudron, citrouilles qui s'allument la nuit. De décembre à
-l'Épiphanie, Noël : guirlande lumineuse, couronne sur la porte, chaussettes, neige sur les rebords
-des fenêtres, poinsettias et sapin clignotant. À Pâques (des dix jours avant le dimanche jusqu'à
-l'Emaischen) : guirlande pastel, œufs suspendus, chasse aux œufs, panier, lapin en chocolat et
-lapins de toutes les couleurs qui sautillent. À Halloween, des araignées descendent du plafond ou
-courent au sol et un petit fantôme traverse parfois la pièce ; à Noël, un train tourne autour du sapin.
-Pendant la Schueberfouer (20 jours à partir du vendredi le plus proche du 24 août) : ampoules de
-fête foraine sous des fanions aux couleurs du drapeau, affiche de la grande roue, ballons, nounours.
-Environ deux Clawd sur cinq se déguisent selon la saison : chapeau de sorcière, cornes, fantôme,
-momie ; bonnet de Père Noël ou d'elfe, bois de renne, pull de Noël ; oreilles de lapin, poussin,
-couronne de fleurs ; chapeau de fête, canotier, ballon. Les fêtes d'un jour passent avant :
-Nouvel An (31 décembre et 1er janvier, cotillons, confettis, feux d'artifice aux fenêtres),
-fêtes nationales luxembourgeoise (22 et 23 juin), française (14 juillet), belge (21 juillet) et
-allemande (3 octobre) avec fanions et drapeau aux couleurs du pays, feux d'artifice et Clawd qui
-agitent un petit drapeau, Fuesend (du jeudi gras au mardi gras : masques, confettis, quatre Clawd
-sur cinq déguisés), Buergbrennen (premier dimanche de Carême et la veille : feux dans les
-fenêtres, bonnets) et Kleeschen (1er au 6 décembre : bottes garnies, Boxemännchen, mitres et
-Houseker). `/?saison=paques` (ou `fouer`, `halloween`, `noel`, `nouvel-an`, `fuesend`,
-`buergbrennen`, `kleeschen`, `fete-lu`, `fete-fr`, `fete-be`, `fete-de`) pour les voir hors
-saison, ou le menu de la Démo. Les cadeaux de Noël s'empilent au pied du sapin et ailleurs ; au
-Nouvel An, champagne et flûtes sur les tables, seau à glace au sol.
+### Ce qui sort de ta machine
 
-Chaque fête pose sa spécialité sur les tables de réunion : Rieslingspaschtéit, Gromperekichelcher,
-Verwurelter, Glühwäin, Boxemännchen et mandarines, bûche, agneau pascal, bonbons, baguette et
-fromage, frites et gaufre, bretzel et bière. Entre les fêtes, la saison de l'année : printemps
-(tulipes, papillons, fraises), été (ventilateur, pastèque et glace, lunettes de soleil, casquettes),
-automne (feuilles mortes, Quetschentaart, écharpes, bérets), hiver (neige aux rebords, chocolat chaud,
-bonnets, écharpes, cache-oreilles). `?saison=printemps` (ou `ete`, `automne`, `hiver`).
+Rien qui concerne tes sessions. Le serveur écoute uniquement sur `127.0.0.1`, et les payloads (qui
+contiennent tes prompts et les entrées d'outils en clair) ne sont jamais écrits sur disque, sauf si
+tu actives le journal de débogage (`CLAWD_LOG=1`, voir plus bas). La seule requête externe est
+celle de la météo : la PWA interroge [Open-Meteo](https://open-meteo.com) (sans clé) toutes les
+30 minutes avec les coordonnées de `public/weather.js`.
 
-Une cheminée est encastrée dans le mur (après le tableau blanc dans les salles, côté salon dans
-l'open space partagé). Le feu s'allume le soir en automne et toute la journée en hiver ; les fêtes
-suivent la saison où elles tombent (Noël, Nouvel An, Fuesend, Buergbrennen : hiver).
+## Installation
 
-Un outil qui échoue (`PostToolUseFailure`, hors annulation) fait sursauter son Clawd sous une croix
-rouge. Après 10 min de travail d'affilée, un Clawd au clavier bâille et s'étire de temps en temps, et
-toutes les 30 min il part prendre un café. Pendant une compaction du contexte (`PreCompact` à
-`PostCompact`), il passe ses notes à la broyeuse.
+Prérequis : macOS ou Linux, [Node.js](https://nodejs.org) 18 ou plus récent, `curl`, Python 3 pour
+les scripts d'installation, et Chrome (ou un navigateur Chromium) pour la PWA. Aucune dépendance npm.
 
-Le titre de l'onglet et l'icône de la PWA installée affichent le nombre d'agents qui attendent un
-input.
+```sh
+git clone https://github.com/mattdaco-dev/clawd-pwa.git
+cd clawd-pwa
+```
 
-Avec `CLAWD_LOG=1`, le hook garde une copie brute de chaque payload dans `logs/events.jsonl`
-(5 Mo max). Coupé par défaut : les payloads contiennent les prompts et les entrées d'outils en
-clair. Le hook est déclaré `async`, il ne bloque jamais Claude : sortie vide, code 0.
+### 1. Lancer le serveur
 
-## Organisation
+Sur macOS, en service qui démarre à l'ouverture de session et redémarre s'il tombe :
 
-- `hooks/clawd-hook.sh` : hook Claude Code, transmet le payload au serveur.
-- `server.js` : traduit les événements en état par agent (`working`, `waiting`, `idle`) et le diffuse en SSE.
-- `public/sprites.js` : toutes les animations, en grilles de pixels composées par code.
-- `public/live.js` : la scène plein écran (vues Live et Démo), `public/gallery.js` : la galerie.
-- `public/weather.js` : la météo affichée aux fenêtres.
-- `public/demo.js` : les sessions inventées de la Démo et sa barre de réglages.
-- `public/seasons.js` : les décorations de saison ; `public/costumes.js` : les déguisements.
-- `public/sun.js` : lever et coucher du soleil ; `public/pixels.js` : les sprites du décor.
-- `public/decor.js` : le registre des décors ; un décor fournit le fond, une zone par session avec ses
-  postes, les meubles triés en profondeur avec les Clawd et un calque redessiné à chaque image.
-- `public/office.js` : le décor open space (salles ou bureau partagé, aménagement tiré au hasard par
-  session) et ses postes : bureau
-  pour taper, bibliothèque et globe pour chercher et le web, tableau blanc pour réfléchir, avant-scène
-  pour attendre un input, coin café (comptoir avec machine, on y boit un café), radio, tapis de jeu
-  et poufs pour la sieste. Deux Clawd au repos dans la même zone se retrouvent parfois sur un tapis
-  pour une passe de ballon ou un duel à l'épée, devant une radio pour danser, ou au comptoir pour
-  discuter tasse en main, chacun son tour avec une bulle (`BallGame`, `SwordDuel`, `DanceDuo`,
-  `CoffeeChat` dans `live.js`). Un troisième vient parfois regarder les jeux et applaudit à la fin,
-  jamais les discussions. Un Clawd qui finit son travail tape dans la main d'un
-  voisin au repos (`HighFive`), et un subagent terminé apporte son rapport à son agent principal.
+```sh
+python3 scripts/install-service.py
+```
+
+Le script écrit le chemin absolu de `node` dans un agent launchd (`~/Library/LaunchAgents/local.clawd-pwa.plist`),
+parce que launchd ne voit pas nvm. Relance-le après un changement de version de Node. Le journal du
+serveur est dans `logs/server.log`.
+
+Sur Linux, ou pour essayer sans service :
+
+```sh
+npm start
+```
+
+Le port par défaut est 4777, modifiable avec `CLAWD_PORT` (à définir aussi dans l'environnement de
+Claude Code pour que le hook suive).
+
+### 2. Brancher le hook
+
+```sh
+python3 scripts/install-hooks.py
+```
+
+Le script ajoute le hook à `~/.claude/settings.json` pour tous les événements listés plus haut,
+sans toucher à tes autres hooks. Il sauvegarde d'abord le fichier
+(`settings.json.bak-clawd-<date>`) et peut être relancé sans créer de doublon. Les sessions déjà
+ouvertes prennent le hook en compte sans redémarrage.
+
+### 3. Installer la PWA
+
+Ouvre <http://localhost:4777> dans Chrome, puis « Installer l'application » dans la barre
+d'adresse (ou le menu ⋮ > Caster, enregistrer et partager > Installer la page en tant
+qu'application). Lance une session Claude Code : son Clawd arrive.
+
+### Désinstaller
+
+```sh
+python3 scripts/install-hooks.py --uninstall
+python3 scripts/install-service.py --uninstall
+```
+
+Puis désinstalle la PWA depuis Chrome.
+
+## Utilisation
+
+Le bouton rond en haut à gauche ouvre le menu :
+
+- **Live** : tes vraies sessions.
+- **Démo** : trois sessions inventées qui suivent un scénario en boucle, sans Claude Code. Sa barre
+  permet de tout essayer : décor, disposition, extérieur, taille des pixels, heure, météo, saison,
+  ajout de Clawd et de subagents, état forcé, erreur d'outil, tirage au hasard.
+- **Galerie** : toutes les animations, regroupées par activité.
+- **Détacher le Live** : la scène passe dans une fenêtre Picture-in-Picture qui reste au-dessus des
+  autres et descend jusqu'à 240 px de large, pratique pour la garder dans un coin de l'écran.
+
+Les réglages du menu sont gardés dans le navigateur :
+
+- **Décor** : « Aucun » (les Clawd seuls, avec en option un bureau chacun) ou « Avec » (le bureau
+  complet).
+- **Disposition** : une salle par session, en plan d'étage avec couloirs et passages, ou un open
+  space partagé où tout le monde se partage les postes.
+- **Extérieur** : un monde différent chaque jour, ou un monde fixe, ou aucun.
+- **Taille des pixels** : de 1 à 6.
+- **Notifications** quand un agent attend.
+
+### Paramètres d'URL
+
+Pour voir le décor dans d'autres conditions sans attendre :
+
+| Paramètre | Valeurs |
+| --- | --- |
+| `?heure=` | une heure de 0 à 23, par exemple `?heure=22` pour la nuit |
+| `?meteo=` | `soleil`, `nuages`, `brouillard`, `pluie`, `neige`, `orage` |
+| `?saison=` | `printemps`, `ete`, `automne`, `hiver`, `halloween`, `noel`, `paques`, `nouvel-an`, `fouer`, `fuesend`, `buergbrennen`, `kleeschen`, `fete-lu`, `fete-fr`, `fete-be`, `fete-de` |
+
+### Ta ville
+
+La météo, le lever et le coucher du soleil sont calculés pour Luxembourg. Pour ta ville, change
+`LAT` et `LON` dans `public/weather.js`.
+
+### Journal de débogage
+
+Avec `CLAWD_LOG=1` dans l'environnement de Claude Code, le hook garde une copie brute de chaque
+payload dans `logs/events.jsonl` (5 Mo maximum, puis rotation). Désactivé par défaut, puisque ces
+payloads contiennent tes prompts en clair.
+
+## Organisation du code
+
+| Fichier | Rôle |
+| --- | --- |
+| `hooks/clawd-hook.sh` | Le hook : transmet le payload au serveur, en arrière-plan. |
+| `server.js` | Traduit les événements en état par agent et le diffuse en SSE. Sert aussi la PWA. |
+| `scripts/install-hooks.py` | Branche ou retire le hook dans `~/.claude/settings.json`. |
+| `scripts/install-service.py` | Installe ou retire le service launchd (macOS). |
+| `public/app.js` | Menu, réglages, vues, notifications, fenêtre Picture-in-Picture. |
+| `public/live.js` | La scène : comportement des Clawd, jeux à plusieurs, fiche d'un agent. |
+| `public/sprites.js` | Toutes les animations des Clawd, en grilles de pixels. |
+| `public/office.js` | Le décor intérieur : salles, open space, meubles, postes de travail. |
+| `public/outdoors.js` | Les extérieurs. |
+| `public/seasons.js`, `public/costumes.js` | Décorations de saison, fêtes et déguisements. |
+| `public/sun.js`, `public/weather.js` | Lever et coucher du soleil, météo. |
+| `public/cat.js` | Le chat. |
+| `public/demo.js` | Les sessions inventées de la Démo et sa barre de réglages. |
+
+## Crédits
+
+Projet de fan, non officiel et sans lien avec Anthropic. Clawd et Claude Code appartiennent à
+Anthropic ; les sprites de ce dépôt sont redessinés à la main en pixel art.
