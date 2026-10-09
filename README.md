@@ -8,15 +8,12 @@ answer, and wanders around, plays or naps when it has nothing to do.
   <img src="docs/aucun-decor.png" width="512" height="512" alt="Three Clawds typing at their desks; two smaller, lighter subagents wait for an answer, one waving a checkered flag, the other under an exclamation mark">
 </p>
 
-Above is the simplest setup: one desk per session (`démo`, `api`, `web`). The three main agents are
+Above is the simplest setup: one desk per session (`demo`, `api`, `web`). The three main agents are
 working; the small, lighter Clawds are subagents waiting for an answer, one with its flag, the
 other with its speech bubble.
 
 Everything runs locally: a Claude Code hook, a tiny dependency-free Node server and a PWA you
 install from Chrome. The hook doesn't slow your prompts down and costs no tokens (details below).
-
-The interface is in French. Menu labels below are given as they appear on screen, with a
-translation.
 
 ## What you see
 
@@ -147,21 +144,21 @@ Then uninstall the PWA from Chrome.
 The round button at the top left opens the menu:
 
 - **Live**: your real sessions.
-- **Démo** (demo): three made-up sessions looping through a script, no Claude Code needed. Its bar
+- **Demo**: three made-up sessions looping through a script, no Claude Code needed. Its bar
   lets you try everything: backdrop, layout, outside view, pixel size, time, weather, season,
   adding Clawds and subagents, forcing a state, tool errors, random picks.
-- **Galerie** (gallery): every animation, grouped by activity.
-- **Détacher le Live** (detach Live): the scene moves into a Picture-in-Picture window that stays
+- **Gallery**: every animation, grouped by activity.
+- **Detach Live**: the scene moves into a Picture-in-Picture window that stays
   on top of other windows and shrinks down to 240 px wide, handy to keep in a corner of the screen.
 
 Menu settings are saved in the browser:
 
-- **Décor** (backdrop): "Aucun" (none: just the Clawds, optionally with a desk each) or "Avec"
-  (with: the full office).
-- **Disposition** (layout): one room per session, as a floor plan with corridors and doorways, or a
+- **Backdrop**: "None" (just the Clawds, optionally with a desk each) or "Office" (the full
+  office).
+- **Layout**: one room per session, as a floor plan with corridors and doorways, or a
   shared open space where everyone shares the desks.
-- **Extérieur** (outside): a different world each day, a fixed world, or none.
-- **Taille des pixels** (pixel size): from 1 to 6.
+- **Outside**: a different world each day, a fixed world, or none.
+- **Pixel size**: from 1 to 6.
 - **Notifications** when an agent is waiting.
 
 ### URL parameters
@@ -170,9 +167,9 @@ To see the backdrop in other conditions without waiting:
 
 | Parameter | Values |
 | --- | --- |
-| `?heure=` (hour) | an hour from 0 to 23, for example `?heure=22` for night |
-| `?meteo=` (weather) | `soleil` (sun), `nuages` (clouds), `brouillard` (fog), `pluie` (rain), `neige` (snow), `orage` (storm) |
-| `?saison=` (season) | `printemps` (spring), `ete` (summer), `automne` (autumn), `hiver` (winter), `halloween`, `noel` (Christmas), `paques` (Easter), `nouvel-an` (New Year), `fouer`, `fuesend`, `buergbrennen`, `kleeschen`, `fete-lu`, `fete-fr`, `fete-be`, `fete-de` (national days of Luxembourg, France, Belgium, Germany) |
+| `?hour=` | an hour from 0 to 23, for example `?hour=22` for night |
+| `?weather=` | `clear`, `cloudy`, `fog`, `rain`, `snow`, `storm` |
+| `?season=` | `spring`, `summer`, `autumn`, `winter`, `halloween`, `christmas`, `easter`, `new-year`, `fouer` (Schueberfouer), `fuesend` (carnival), `buergbrennen`, `kleeschen` (Saint Nicholas), `national-lu`, `national-fr`, `national-be`, `national-de` (national days of Luxembourg, France, Belgium, Germany) |
 
 ### Your city
 
@@ -201,7 +198,7 @@ prompts in plain text.
 | `public/seasons.js`, `public/costumes.js` | Seasonal decorations, holidays and costumes. |
 | `public/sun.js`, `public/weather.js` | Sunrise and sunset, weather. |
 | `public/cat.js` | The cat. |
-| `public/demo.js` | The Démo's made-up sessions and its settings bar. |
+| `public/demo.js` | The Demo's made-up sessions and its settings bar. |
 
 ## Credits
 

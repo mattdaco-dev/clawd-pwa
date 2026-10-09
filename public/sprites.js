@@ -274,7 +274,7 @@ const CONFETTI = [
 export const ANIMS = {
   // Working
   'type-front': {
-    label: 'Tape au clavier',
+    label: 'Types on the keyboard',
     fps: 8,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -285,7 +285,7 @@ export const ANIMS = {
     }),
   },
   'type-laptop': {
-    label: 'Tape sur le laptop',
+    label: 'Types on the laptop',
     fps: 8,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -295,7 +295,7 @@ export const ANIMS = {
     }),
   },
   'type-side': {
-    label: 'Tape au bureau, de profil',
+    label: 'Types at the desk, side view',
     fps: 8,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -303,7 +303,7 @@ export const ANIMS = {
     }),
   },
   search: {
-    label: 'Enquête',
+    label: 'Investigates',
     fps: 4,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -314,7 +314,7 @@ export const ANIMS = {
   },
   // Reading at the bookshelf: an open book held low, a page turned now and then.
   read: {
-    label: 'Lit un livre',
+    label: 'Reads a book',
     fps: 4,
     loop: true,
     frames: frames(12, (f, i) => {
@@ -332,7 +332,7 @@ export const ANIMS = {
     }),
   },
   globe: {
-    label: 'Regarde le globe',
+    label: 'Looks at the globe',
     fps: 4,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -345,7 +345,7 @@ export const ANIMS = {
     }),
   },
   music: {
-    label: 'Écoute de la musique',
+    label: 'Listens to music',
     fps: 5,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -357,7 +357,7 @@ export const ANIMS = {
     }),
   },
   think: {
-    label: 'Réfléchit',
+    label: 'Thinks',
     fps: 3,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -372,7 +372,7 @@ export const ANIMS = {
   // Tidies its notes while the conversation is compacted: a sheet from the
   // stack on the left goes through the shredder on the right.
   compact: {
-    label: 'Passe ses notes à la broyeuse',
+    label: 'Shreds its notes',
     fps: 5,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -393,7 +393,7 @@ export const ANIMS = {
 
   // Waiting for input
   flag: {
-    label: 'Drapeau',
+    label: 'Flag',
     fps: 6,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -403,7 +403,7 @@ export const ANIMS = {
     }),
   },
   bubble: {
-    label: 'Bulle « ! »',
+    label: '"!" bubble',
     fps: 4,
     loop: true,
     frames: frames(6, (f, i) => {
@@ -415,7 +415,7 @@ export const ANIMS = {
     }),
   },
   wave: {
-    label: 'Fait signe',
+    label: 'Waves',
     fps: 5,
     loop: true,
     frames: frames(4, (f, i) => {
@@ -432,7 +432,7 @@ export const ANIMS = {
 
   // Idle
   walk: {
-    label: 'Se balade',
+    label: 'Walks around',
     fps: 6,
     loop: true,
     frames: frames(4, (f, i) => {
@@ -445,7 +445,7 @@ export const ANIMS = {
     }),
   },
   breathe: {
-    label: 'Cligne des yeux',
+    label: 'Blinks',
     fps: 4,
     loop: true,
     frames: frames(12, (f, i) => {
@@ -453,7 +453,7 @@ export const ANIMS = {
     }),
   },
   look: {
-    label: 'Regarde autour',
+    label: 'Looks around',
     fps: 4,
     loop: true,
     frames: frames(12, (f, i) => {
@@ -462,7 +462,7 @@ export const ANIMS = {
     }),
   },
   jump: {
-    label: 'Saute',
+    label: 'Jumps',
     fps: 8,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -477,7 +477,7 @@ export const ANIMS = {
     }),
   },
   dance: {
-    label: 'Danse',
+    label: 'Dances',
     fps: 6,
     loop: true,
     // Sways side to side with disco arms (one up, one down) and sparkles, so it
@@ -507,7 +507,7 @@ export const ANIMS = {
     }),
   },
   ball: {
-    label: 'Joue au ballon',
+    label: 'Plays ball',
     fps: 8,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -525,7 +525,7 @@ export const ANIMS = {
   // Ball passing between two Clawds, facing right; the scene flips the one on
   // the right and flies the ball between them (see PASS_BALL for its spots).
   'pass-throw': {
-    label: 'Fait une passe',
+    label: 'Passes the ball',
     fps: 8,
     loop: false,
     frames: frames(5, (f, i) => {
@@ -541,7 +541,7 @@ export const ANIMS = {
     }),
   },
   'pass-ready': {
-    label: 'Attend la passe',
+    label: 'Waits for the pass',
     fps: 4,
     loop: true,
     frames: frames(4, (f, i) => {
@@ -560,7 +560,7 @@ export const ANIMS = {
     }),
   },
   'sword-strike': {
-    label: 'Attaque',
+    label: 'Strikes',
     fps: 10,
     loop: false,
     frames: frames(6, (f, i) => {
@@ -571,7 +571,7 @@ export const ANIMS = {
     }),
   },
   'sword-block': {
-    label: 'Pare',
+    label: 'Blocks',
     fps: 10,
     loop: false,
     frames: frames(6, (f, i) => {
@@ -581,7 +581,7 @@ export const ANIMS = {
     }),
   },
   'sword-win': {
-    label: 'Gagne le duel',
+    label: 'Wins the duel',
     fps: 8,
     loop: false,
     frames: frames(8, (f, i) => {
@@ -592,7 +592,7 @@ export const ANIMS = {
     }),
   },
   'sword-lose': {
-    label: 'Perd le duel',
+    label: 'Loses the duel',
     fps: 4,
     loop: true,
     frames: frames(4, (f, i) => {
@@ -609,7 +609,7 @@ export const ANIMS = {
   },
   // Dancing with the Clawd on the right, who mirrors the same frames.
   'duo-dance': {
-    label: 'Danse à deux',
+    label: 'Dances as a pair',
     fps: 6,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -632,7 +632,7 @@ export const ANIMS = {
   },
   // High five with the Clawd on the right: reach, slap, hop.
   'high-five': {
-    label: 'Tape dans la main',
+    label: 'High five',
     fps: 8,
     loop: false,
     frames: frames(8, (f, i) => {
@@ -649,7 +649,7 @@ export const ANIMS = {
   },
   // A coffee at the counter: steaming mug, a sip, a satisfied look.
   coffee: {
-    label: 'Boit un café',
+    label: 'Drinks a coffee',
     fps: 4,
     loop: true,
     frames: frames(12, (f, i) => {
@@ -667,7 +667,7 @@ export const ANIMS = {
   },
   // Chatting over a coffee with the Clawd on the right, mug in hand.
   'coffee-talk': {
-    label: 'Raconte, tasse en main',
+    label: 'Talks, cup in hand',
     fps: 4,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -682,7 +682,7 @@ export const ANIMS = {
     }),
   },
   'coffee-listen': {
-    label: 'Écoute, tasse en main',
+    label: 'Listens, cup in hand',
     fps: 3,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -700,7 +700,7 @@ export const ANIMS = {
   },
   // A tool failed: startled, a red cross pops up, then a puzzled look around.
   oops: {
-    label: 'Oups, erreur',
+    label: 'Oops, error',
     fps: 7,
     loop: false,
     frames: frames(10, (f, i) => {
@@ -740,7 +740,7 @@ export const ANIMS = {
   },
   // Tests green: a tick pops up and it bounces.
   'tests-green': {
-    label: 'Tests verts',
+    label: 'Green tests',
     fps: 7,
     loop: false,
     frames: frames(9, (f, i) => {
@@ -757,7 +757,7 @@ export const ANIMS = {
   },
   // Tests red: slumped, eyes down, under its own little rain cloud.
   'tests-red': {
-    label: 'Tests rouges',
+    label: 'Red tests',
     fps: 4,
     loop: false,
     frames: frames(12, (f, i) => {
@@ -779,7 +779,7 @@ export const ANIMS = {
   },
   // Long hours at the desk: a yawn and a stretch, arms up on tiptoe.
   stretch: {
-    label: 'Bâille et s\'étire',
+    label: 'Yawns and stretches',
     fps: 4,
     loop: false,
     frames: frames(12, (f, i) => {
@@ -800,7 +800,7 @@ export const ANIMS = {
   },
   // Watching a game from the side, facing it.
   cheer: {
-    label: 'Encourage',
+    label: 'Cheers',
     fps: 6,
     loop: true,
     frames: frames(6, (f, i) => {
@@ -815,7 +815,7 @@ export const ANIMS = {
   },
   // A subagent done with its task hands the report to its main agent (on the right).
   handoff: {
-    label: 'Rend son rapport',
+    label: 'Hands in its report',
     fps: 6,
     loop: false,
     frames: frames(8, (f, i) => {
@@ -829,7 +829,7 @@ export const ANIMS = {
     }),
   },
   sleep: {
-    label: 'Dort',
+    label: 'Sleeps',
     fps: 3,
     loop: true,
     frames: frames(8, (f, i) => {
@@ -842,7 +842,7 @@ export const ANIMS = {
 
   // Transitions
   arrive: {
-    label: 'Arrivée',
+    label: 'Arrives',
     fps: 10,
     loop: false,
     frames: frames(7, (f, i) => {
@@ -865,7 +865,7 @@ export const ANIMS = {
     }),
   },
   celebrate: {
-    label: 'Fête ça',
+    label: 'Celebrates',
     fps: 8,
     loop: false,
     frames: frames(10, (f, i) => {
@@ -884,7 +884,7 @@ export const ANIMS = {
     }),
   },
   leave: {
-    label: 'Départ',
+    label: 'Leaves',
     fps: 8,
     loop: false,
     frames: frames(9, (f, i) => {
@@ -909,70 +909,70 @@ export const ANIMS = {
 export const GROUPS = [
   {
     id: 'working',
-    label: 'Travaille',
-    hint: 'L\'agent est occupé. Le costume dépend de l\'outil en cours (PreToolUse).',
+    label: 'Working',
+    hint: 'The agent is busy. The costume depends on the current tool (PreToolUse).',
     items: [
-      ['type-front', 'Edit, Write, Bash et les autres outils, aux bureaux de face'],
-      ['type-laptop', 'Quand tous les bureaux sont pris'],
-      ['type-side', 'Aux bureaux de côté (le bureau fait partie du décor)'],
+      ['type-front', 'Edit, Write, Bash and the other tools, at front-facing desks'],
+      ['type-laptop', 'When every desk is taken'],
+      ['type-side', 'At side desks (the desk is part of the backdrop)'],
       ['search', 'Read, Grep, Glob'],
-      ['compact', 'Compaction du contexte (PreCompact jusqu\'à PostCompact)'],
-      ['read', 'Read, Grep, Glob, en alternance avec l\'enquête'],
-      ['globe', 'WebFetch, WebSearch, outils MCP'],
-      ['think', 'Prompt reçu (UserPromptSubmit), délégation à un subagent'],
+      ['compact', 'Context compaction (PreCompact to PostCompact)'],
+      ['read', 'Read, Grep, Glob, alternating with the investigation'],
+      ['globe', 'WebFetch, WebSearch, MCP tools'],
+      ['think', 'Prompt received (UserPromptSubmit), handing off to a subagent'],
     ],
   },
   {
     id: 'waiting',
-    label: 'Attend un input',
-    hint: 'L\'agent est bloqué tant que tu ne réponds pas.',
+    label: 'Waiting for input',
+    hint: 'The agent is stuck until you answer.',
     items: [
       ['flag', 'PermissionRequest, AskUserQuestion, ExitPlanMode'],
-      ['bubble', 'Notification de permission ou de question'],
-      ['wave', 'En alternance avec les deux autres'],
+      ['bubble', 'Permission or question notification'],
+      ['wave', 'Alternating with the other two'],
     ],
   },
   {
     id: 'idle',
-    label: 'Rien à faire',
-    hint: 'Après Stop. Tirage au hasard entre ces animations, sieste au bout de 2 minutes.',
+    label: 'Nothing to do',
+    hint: 'After Stop. Picked at random among these animations, a nap after 2 minutes.',
     items: [
-      ['walk', 'Se déplace dans sa zone'],
-      ['music', 'Pause musicale, à côté de la radio'],
-      ['breathe', 'Pause entre deux activités'],
-      ['look', 'Pause entre deux activités'],
-      ['jump', 'Jeu'],
-      ['dance', 'Jeu'],
-      ['ball', 'Jeu'],
-      ['pass-throw', 'Passe de ballon, à deux sur un tapis'],
-      ['pass-ready', 'Attend que l\'autre renvoie le ballon'],
-      ['sword-guard', 'Duel à l\'épée, à deux sur un tapis'],
-      ['sword-strike', 'Attaque, l\'autre pare en même temps'],
-      ['sword-block', 'Pare l\'attaque'],
-      ['sword-win', 'Fin du duel, le dernier à attaquer gagne'],
-      ['sword-lose', 'Fin du duel, l\'autre est sonné'],
-      ['duo-dance', 'Danse à deux devant une radio'],
-      ['coffee', 'Pause café au comptoir'],
-      ['coffee-talk', 'Discute au comptoir, une bulle au-dessus de la tête'],
-      ['coffee-listen', 'Écoute l\'autre au comptoir'],
-      ['cheer', 'Un troisième Clawd regarde une partie, puis applaudit à la fin (Fête ça)'],
-      ['sleep', '2 minutes sans activité'],
+      ['walk', 'Moves around its area'],
+      ['music', 'Music break, next to the radio'],
+      ['breathe', 'Pause between two activities'],
+      ['look', 'Pause between two activities'],
+      ['jump', 'Game'],
+      ['dance', 'Game'],
+      ['ball', 'Game'],
+      ['pass-throw', 'Passing the ball, two on a rug'],
+      ['pass-ready', 'Waits for the other to pass the ball back'],
+      ['sword-guard', 'Sword duel, two on a rug'],
+      ['sword-strike', 'Strikes, the other blocks at the same time'],
+      ['sword-block', 'Blocks the strike'],
+      ['sword-win', 'End of the duel, the last to strike wins'],
+      ['sword-lose', 'End of the duel, the other is dazed'],
+      ['duo-dance', 'Dances as a pair in front of a radio'],
+      ['coffee', 'Coffee break at the counter'],
+      ['coffee-talk', 'Chats at the counter, a bubble above its head'],
+      ['coffee-listen', 'Listens to the other at the counter'],
+      ['cheer', 'A third Clawd watches a game, then applauds at the end (Celebrates)'],
+      ['sleep', '2 minutes without activity'],
     ],
   },
   {
     id: 'events',
     label: 'Transitions',
-    hint: 'Jouées une fois, au changement d\'état.',
+    hint: 'Played once, when the state changes.',
     items: [
       ['arrive', 'SessionStart, SubagentStart'],
-      ['celebrate', 'Stop après un travail'],
-      ['high-five', 'Stop après un travail, avec un Clawd au repos à côté'],
-      ['handoff', 'SubagentStop : le subagent rejoint son agent principal'],
-      ['oops', 'PostToolUseFailure : un outil a échoué (pas une annulation)'],
-      ['commit', 'Bash : git commit réussi'],
-      ['tests-green', 'Bash : commande de tests réussie (npm test, vitest, pytest…)'],
-      ['tests-red', 'Bash : commande de tests en échec'],
-      ['stretch', 'Au bureau après 10 min de travail d\'affilée, de temps en temps'],
+      ['celebrate', 'Stop after some work'],
+      ['high-five', 'Stop after some work, with an idle Clawd nearby'],
+      ['handoff', 'SubagentStop: the subagent rejoins its main agent'],
+      ['oops', 'PostToolUseFailure: a tool failed (not a cancellation)'],
+      ['commit', 'Bash: successful git commit'],
+      ['tests-green', 'Bash: successful test command (npm test, vitest, pytest…)'],
+      ['tests-red', 'Bash: failing test command'],
+      ['stretch', 'At the desk after 10 min of work in a row, now and then'],
       ['leave', 'SubagentStop, SessionEnd'],
     ],
   },

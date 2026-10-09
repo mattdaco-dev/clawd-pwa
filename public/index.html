@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,36 +19,36 @@
     </button>
     <nav id="menu-nav" hidden>
       <a href="#/" data-view="live">Live</a>
-      <a href="#/demo" data-view="demo">Démo</a>
-      <a href="#/galerie" data-view="galerie">Galerie</a>
-      <button type="button" class="detach" hidden>Détacher le Live</button>
+      <a href="#/demo" data-view="demo">Demo</a>
+      <a href="#/gallery" data-view="gallery">Gallery</a>
+      <button type="button" class="detach" hidden>Detach Live</button>
       <fieldset class="setting">
-        <legend>Décor</legend>
-        <label><input type="radio" name="decor" value="none"> Aucun</label>
-        <label><input type="radio" name="decor" value="open-space"> Avec</label>
+        <legend>Backdrop</legend>
+        <label><input type="radio" name="decor" value="none"> None</label>
+        <label><input type="radio" name="decor" value="open-space"> Office</label>
       </fieldset>
       <fieldset class="setting inline" data-needs-bare>
-        <legend>Un bureau par Clawd</legend>
-        <label><input type="radio" name="desk" value="off"> Non</label>
-        <label><input type="radio" name="desk" value="on"> Oui</label>
+        <legend>A desk per Clawd</legend>
+        <label><input type="radio" name="desk" value="off"> No</label>
+        <label><input type="radio" name="desk" value="on"> Yes</label>
       </fieldset>
       <fieldset class="setting" data-needs-decor>
-        <legend>Disposition</legend>
-        <label><input type="radio" name="layout" value="rooms"> Salles</label>
-        <label><input type="radio" name="layout" value="shared"> Open space partagé</label>
+        <legend>Layout</legend>
+        <label><input type="radio" name="layout" value="rooms"> Rooms</label>
+        <label><input type="radio" name="layout" value="shared"> Shared open space</label>
       </fieldset>
       <fieldset class="setting" data-needs-decor>
-        <legend>Extérieur</legend>
-        <label><input type="radio" name="outside" value="random"> Au hasard <small>(un par jour)</small></label>
-        <label><input type="radio" name="outside" value="none"> Aucun</label>
-        <label><input type="radio" name="outside" value="ville"> Ville</label>
+        <legend>Outside</legend>
+        <label><input type="radio" name="outside" value="random"> Random <small>(one a day)</small></label>
+        <label><input type="radio" name="outside" value="none"> None</label>
+        <label><input type="radio" name="outside" value="ville"> City</label>
         <label><input type="radio" name="outside" value="village"> Village</label>
-        <label><input type="radio" name="outside" value="campagne"> Campagne</label>
-        <label><input type="radio" name="outside" value="mer"> Bord de mer</label>
-        <label><input type="radio" name="outside" value="espace"> Vaisseau spatial</label>
+        <label><input type="radio" name="outside" value="campagne"> Countryside</label>
+        <label><input type="radio" name="outside" value="mer"> Seaside</label>
+        <label><input type="radio" name="outside" value="espace"> Spaceship</label>
       </fieldset>
       <fieldset class="setting inline">
-        <legend>Taille des pixels</legend>
+        <legend>Pixel size</legend>
         <label><input type="radio" name="px" value="1"> 1</label>
         <label><input type="radio" name="px" value="2"> 2</label>
         <label><input type="radio" name="px" value="3"> 3</label>
@@ -57,21 +57,21 @@
         <label><input type="radio" name="px" value="6"> 6</label>
       </fieldset>
       <fieldset class="setting inline" data-notify>
-        <legend>Notifier quand un agent attend</legend>
-        <label><input type="radio" name="notify" value="off"> Non</label>
-        <label><input type="radio" name="notify" value="on"> Oui</label>
+        <legend>Notify when an agent is waiting</legend>
+        <label><input type="radio" name="notify" value="off"> No</label>
+        <label><input type="radio" name="notify" value="on"> Yes</label>
       </fieldset>
     </nav>
   </div>
 
   <section id="live" class="scene" hidden></section>
   <section id="detached" class="scene detached" hidden>
-    <p>Le Live est dans une fenêtre flottante.</p>
-    <button type="button" class="reattach">Le remettre ici</button>
+    <p>Live is in a floating window.</p>
+    <button type="button" class="reattach">Bring it back here</button>
   </section>
   <section id="demo" class="scene" hidden></section>
   <section id="gallery" hidden>
-    <p class="intro">Toutes les animations, regroupées par activité de l'agent. À gauche le Clawd du main, à droite celui d'un subagent.</p>
+    <p class="intro">Every animation, grouped by agent activity. On the left the main agent's Clawd, on the right a subagent's.</p>
   </section>
 
   <script type="module" src="/app.js"></script>

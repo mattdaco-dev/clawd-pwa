@@ -29,7 +29,7 @@ export function createGallery(root) {
       card.insertAdjacentHTML(
         'beforeend',
         `<h3>${anim.label}</h3><p>${trigger}</p>` +
-          `<p class="meta">${anim.frames.length} images · ${anim.fps} i/s${anim.loop ? '' : ' · une fois'}</p>`,
+          `<p class="meta">${anim.frames.length} frames · ${anim.fps} fps${anim.loop ? '' : ' · once'}</p>`,
       );
       grid.append(card);
       cards.push({ anim, ctx, width, height });

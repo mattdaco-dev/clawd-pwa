@@ -259,10 +259,16 @@ function fouerStart(year) {
   return new Date(year, 7, 24 + (back <= 3 ? -back : 7 - back));
 }
 
+// `?season=` takes English names; the ids used everywhere else stay as they are.
+const URL_SEASONS = {
+  spring: 'printemps', summer: 'ete', autumn: 'automne', winter: 'hiver', christmas: 'noel', easter: 'paques', 'new-year': 'nouvel-an',
+  'national-lu': 'fete-lu', 'national-fr': 'fete-fr', 'national-be': 'fete-be', 'national-de': 'fete-de',
+};
+
 // One-day feasts come before the long seasons they fall in.
 export function seasonOf(date) {
-  const forced = new URLSearchParams(location.search).get('saison');
-  if (forced) return forced;
+  const forced = new URLSearchParams(location.search).get('season');
+  if (forced) return URL_SEASONS[forced] ?? forced;
   const m = date.getMonth();
   const d = date.getDate();
   const day = new Date(date.getFullYear(), m, d);
